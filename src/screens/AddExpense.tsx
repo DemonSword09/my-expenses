@@ -1,4 +1,5 @@
 // src/screens/AddExpense.tsx
+
 import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
@@ -11,21 +12,34 @@ import {
   Modal,
   FlatList,
   Alert,
+  Platform,
+  useColorScheme,
 } from 'react-native';
+
+import { formatColorValue } from '../utils/colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { CategoryRepo } from '../db/repositories/CategoryRepo';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
-import type { Category } from '../db/models';
+import type { Category, Payee, Transaction } from '../db/models';
+import { format } from 'date-fns';
+import { first, run } from '@src/db/sqlite';
 
 export default function AddExpenseScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
 
-  const [merchant, setMerchant] = useState(''); // still available if you want to store payee
+  // detect edit mode if route.params.id is present
+  const params: any = (route as any).params ?? {};
+  const editId: string | undefined = params.id;
+
+  const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Category modal drilldown state
   const [catModalVisible, setCatModalVisible] = useState(false);
   const [stackParents, setStackParents] = useState<Array<{ id: string | null; label?: string }>>([
     { id: null, label: 'Categories' },
@@ -33,10 +47,14 @@ export default function AddExpenseScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
+  // date picker
+  const [dateMs, setDateMs] = useState<number>(Date.now());
+  const [showPicker, setShowPicker] = useState(false);
+
   useEffect(() => {
-    // load top-level categories initially
     loadCategories(null);
-  }, []);
+    if (editId) loadTransaction(editId);
+  }, [editId]);
 
   const loadCategories = async (parentId: string | null) => {
     try {
@@ -48,33 +66,48 @@ export default function AddExpenseScreen() {
     }
   };
 
+  const loadTransaction = async (id: string) => {
+    try {
+      const t = await TransactionRepo.findById(id);
+      if (!t) return;
+      setAmount(String(t.amount));
+      setNotes(t.comment ?? '');
+      setDateMs(t.createdAt ?? Date.now());
+      if (t.categoryId) {
+        const cat = await CategoryRepo.findById(t.categoryId);
+        if (cat) setSelectedCategory(cat);
+      }
+      if (t.payeeId) {
+        // fetch payee name if you want to prefill merchant (optional)
+        const r: Payee | null = await first('SELECT name FROM payees WHERE id = ? LIMIT 1', [
+          t.payeeId,
+        ]);
+        if (r) setMerchant(r.name);
+        // if earlier pattern not useful, keep merchant empty (payee handling is optional)
+      }
+    } catch (err) {
+      console.error('failed loading transaction', err);
+    }
+  };
+
   const openModal = async () => {
     setStackParents([{ id: null, label: 'Categories' }]);
     await loadCategories(null);
     setCatModalVisible(true);
   };
 
-  const onPressCategory = async (item: Category, fetch: boolean = true) => {
-    // check if this item has children
+  const onPressCategory = async (item: Category) => {
     try {
-      let children: Category[];
-      if (fetch) {
-        children = await CategoryRepo.listByParent(item.id);
-      } else {
-        children = [];
-      }
+      const children = await CategoryRepo.listByParent(item.id);
       if (children.length > 0) {
-        // drill down
         setStackParents((s) => [...s, { id: item.id, label: item.label }]);
         setCategories(children);
       } else {
-        // select leaf category
         setSelectedCategory(item);
         setCatModalVisible(false);
       }
     } catch (err) {
       console.error('error checking children', err);
-      // fallback: select anyway
       setSelectedCategory(item);
       setCatModalVisible(false);
     }
@@ -82,7 +115,6 @@ export default function AddExpenseScreen() {
 
   const onModalBack = async () => {
     if (stackParents.length <= 1) {
-      // top level: close
       setCatModalVisible(false);
       return;
     }
@@ -92,12 +124,20 @@ export default function AddExpenseScreen() {
     await loadCategories(parentEntry.id ?? null);
   };
 
+  const onChangeDate = (event: any, selected?: Date) => {
+    setShowPicker(Platform.OS === 'ios');
+    if (selected) {
+      setDateMs(selected.getTime());
+    } else if (event?.timestamp) {
+      setDateMs(event.timestamp);
+    }
+  };
+
   const handleSave = async () => {
     if (!amount) {
       Alert.alert('Missing amount', 'Please enter an amount.');
       return;
     }
-
     const parsed = parseFloat(amount);
     if (Number.isNaN(parsed)) {
       Alert.alert('Invalid amount', 'Please enter a valid number for amount.');
@@ -105,56 +145,92 @@ export default function AddExpenseScreen() {
     }
 
     try {
-      const payee = await TransactionRepo.addPayee({ name: merchant });
-      const created = await TransactionRepo.create({
-        amount: parsed,
-        comment: notes ?? null,
-        categoryId: selectedCategory?.id,
-        transaction_type: 'EXPENSE',
-        payeeId: payee.id,
-        // accountId omitted - TransactionRepo ensures a default account exists
-      });
+      // ensure payee exists (normalize)
+      let payeeId: string | undefined = undefined;
+      const name = merchant.trim();
+      if (name) {
+        const p = await TransactionRepo.addPayee({ name });
+        payeeId = p.id;
+      }
 
-      console.log('Created transaction', created);
-      console.log('Created Payee', payee);
+      if (editId) {
+        // update existing
+        const a = await TransactionRepo.update(editId, {
+          amount: parsed,
+          comment: notes ?? null,
+          categoryId: selectedCategory?.id ?? null,
+          payeeId: payeeId ?? null,
+          createdAt: dateMs,
+        });
+        // console.log(a);
+      } else {
+        const a = await TransactionRepo.create({
+          amount: parsed,
+          comment: notes ?? null,
+          categoryId: selectedCategory?.id ?? null,
+          payeeId: payeeId ?? null,
+          transaction_type: 'EXPENSE',
+          createdAt: dateMs,
+        });
+        // console.log(a);
+      }
       navigation.goBack();
     } catch (err) {
-      console.error('Failed to create transaction', err);
+      console.error('Failed to save transaction', err);
       Alert.alert('Save failed', 'Unable to save transaction.');
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={isDark ? styles.containerDark : styles.container}>
       <StatusBar
-        barStyle="dark-content"
-        translucent={false}
-        backgroundColor="#F7F7FA"
-        hidden={false}
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={isDark ? '#0b1226' : '#F7F7FA'}
       />
+
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Add Expense</Text>
+        <Text style={[styles.headerTitle, isDark ? styles.textDark : undefined]}>
+          {editId ? 'Edit Expense' : 'Add Expense'}
+        </Text>
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Merchant / Payee</Text>
+        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Merchant / Payee</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, isDark ? styles.inputDark : undefined]}
           placeholder="e.g. Starbucks"
+          placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
           value={merchant}
           onChangeText={setMerchant}
         />
 
-        <Text style={styles.label}>Amount</Text>
+        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Amount</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, isDark ? styles.inputDark : undefined]}
           placeholder="0.00"
           keyboardType="decimal-pad"
           value={amount}
           onChangeText={setAmount}
         />
 
-        <Text style={styles.label}>Category</Text>
+        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Date</Text>
+        <TouchableOpacity
+          style={[styles.input, styles.pickerTrigger]}
+          onPress={() => setShowPicker(true)}
+        >
+          <Text>{format(new Date(dateMs), 'PP')}</Text>
+        </TouchableOpacity>
+        {showPicker && (
+          <DateTimePicker
+            value={new Date(dateMs)}
+            mode="date"
+            display="default"
+            onChange={onChangeDate}
+            maximumDate={new Date(2100, 0, 1)}
+          />
+        )}
+
+        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Category</Text>
         <TouchableOpacity onPress={openModal} style={[styles.input, styles.pickerTrigger]}>
           {selectedCategory ? (
             <Text>{selectedCategory.label}</Text>
@@ -163,10 +239,11 @@ export default function AddExpenseScreen() {
           )}
         </TouchableOpacity>
 
-        <Text style={styles.label}>Notes</Text>
+        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Notes</Text>
         <TextInput
-          style={[styles.input, styles.multiline]}
+          style={[styles.input, styles.multiline, isDark ? styles.inputDark : undefined]}
           placeholder="Optional notes..."
+          placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
           value={notes}
           onChangeText={setNotes}
           multiline
@@ -197,22 +274,17 @@ export default function AddExpenseScreen() {
               data={categories}
               keyExtractor={(i) => i.id}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => onPressCategory(item)}
-                  onLongPress={() => onPressCategory(item, false)}
-                  style={modalStyles.row}
-                >
+                <TouchableOpacity onPress={() => onPressCategory(item)} style={modalStyles.row}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MaterialCommunityIcons
-                      name={item.icon as any}
-                      size={24}
-                      color={item.color ? '#' + item.color.toString() : '#777c84ff'}
-                      style={{ marginRight: 10 }}
-                    />
+                    <View style={modalStyles.iconPlaceholder}>
+                      <MaterialCommunityIcons
+                        name={item.icon as any}
+                        size={22}
+                        color={formatColorValue(item.color, '#2563EB')}
+                      />
+                    </View>
                     <Text style={modalStyles.rowText}>{item.label}</Text>
                   </View>
-
-                  {/* arrow indicates there might be children; we optimistically show it when item might have children later */}
                   <Text style={{ color: '#9CA3AF' }}>{'›'}</Text>
                 </TouchableOpacity>
               )}
@@ -229,6 +301,7 @@ export default function AddExpenseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F7F7FA' },
+  containerDark: { flex: 1, backgroundColor: '#0b1226' },
   header: { padding: 16, paddingTop: 12 },
   headerTitle: { fontSize: 20, fontWeight: '700' },
 
@@ -242,6 +315,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     elevation: 1,
   },
+  inputDark: { backgroundColor: '#111827', color: '#fff' },
   pickerTrigger: { justifyContent: 'center', height: 48 },
   multiline: { height: 80, textAlignVertical: 'top' },
   saveButton: {
@@ -253,6 +327,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   saveText: { color: '#FFF', fontWeight: '700' },
+  textDark: { color: '#fff' },
 });
 
 const modalStyles = StyleSheet.create({

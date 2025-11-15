@@ -20,10 +20,18 @@ async function markApplied(name: string): Promise<void> {
 
 export async function runMigrations(): Promise<void> {
   try {
+    // await exec(`
+    //   DROP TABLE migrations;
+    //   DROP TABLE accounts;
+    //   DROP TABLE payees;
+    //   DROP TABLE categories;
+    //   DROP TABLE transactions;
+    //   DROP TABLE transfers;
+    //   `);
     await exec(`CREATE TABLE IF NOT EXISTS migrations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                applied_at TEXT NOT NULL);`);
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      applied_at TEXT NOT NULL);`);
     const name = '001_create_schema';
     const already = await isApplied(name);
     if (!already) {

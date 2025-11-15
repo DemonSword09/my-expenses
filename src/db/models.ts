@@ -32,7 +32,7 @@ export interface Transaction {
   comment?: string | null;
   accountId: UUID;
   payeeId?: UUID | null;
-  categoryId?: UUID;
+  categoryId?: UUID | null;
   status?: string | null;
   last_modified?: number | null;
   cr_amount?: number | null;
