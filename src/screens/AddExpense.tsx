@@ -1,356 +1,156 @@
 // src/screens/AddExpense.tsx
-
-import React, { useEffect, useState } from 'react';
-import {
-  SafeAreaView,
-  StatusBar,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  FlatList,
-  Alert,
-  Platform,
-  useColorScheme,
-} from 'react-native';
-
-import { formatColorValue } from '../utils/colors';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React from 'react';
+import { StatusBar, View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { CategoryRepo } from '../db/repositories/CategoryRepo';
-import { TransactionRepo } from '../db/repositories/TransactionRepo';
-import type { Category, Payee, Transaction } from '../db/models';
+import useTheme from '../hooks/useTheme';
+import useAddExpense from '../hooks/useAddExpense';
+import CategoryPicker from '../components/CategoryPicker';
 import { format } from 'date-fns';
-import { first, run } from '@src/db/sqlite';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+/**
+ * Thin screen wiring into useAddExpense + CategoryPicker.
+ * UI styling via globalStyles (g) and addExpenseStyles (s).
+ */
 export default function AddExpenseScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const scheme = useColorScheme();
-  const isDark = scheme === 'dark';
-
-  // detect edit mode if route.params.id is present
   const params: any = (route as any).params ?? {};
   const editId: string | undefined = params.id;
 
-  const [merchant, setMerchant] = useState('');
-  const [amount, setAmount] = useState('');
-  const [notes, setNotes] = useState('');
+  const { scheme, schemeColors, globalStyle } = useTheme();
+  const s = require('../styles/addExpenseStyles').addExpenseStyles(scheme);
 
-  const [catModalVisible, setCatModalVisible] = useState(false);
-  const [stackParents, setStackParents] = useState<Array<{ id: string | null; label?: string }>>([
-    { id: null, label: 'Categories' },
-  ]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  // hook containing logic; pass editId for edit mode
+  const {
+    merchant,
+    setMerchant,
+    amount,
+    setAmount,
+    notes,
+    setNotes,
 
-  // date picker
-  const [dateMs, setDateMs] = useState<number>(Date.now());
-  const [showPicker, setShowPicker] = useState(false);
+    dateMs,
+    showPicker,
+    openDatePicker,
+    onDateChange,
 
-  useEffect(() => {
-    loadCategories(null);
-    if (editId) loadTransaction(editId);
-  }, [editId]);
-
-  const loadCategories = async (parentId: string | null) => {
-    try {
-      const rows = await CategoryRepo.listByParent(parentId);
-      setCategories(rows);
-    } catch (err) {
-      console.error('failed loading categories', err);
-      setCategories([]);
-    }
-  };
-
-  const loadTransaction = async (id: string) => {
-    try {
-      const t = await TransactionRepo.findById(id);
-      if (!t) return;
-      setAmount(String(t.amount));
-      setNotes(t.comment ?? '');
-      setDateMs(t.createdAt ?? Date.now());
-      if (t.categoryId) {
-        const cat = await CategoryRepo.findById(t.categoryId);
-        if (cat) setSelectedCategory(cat);
-      }
-      if (t.payeeId) {
-        // fetch payee name if you want to prefill merchant (optional)
-        const r: Payee | null = await first('SELECT name FROM payees WHERE id = ? LIMIT 1', [
-          t.payeeId,
-        ]);
-        if (r) setMerchant(r.name);
-        // if earlier pattern not useful, keep merchant empty (payee handling is optional)
-      }
-    } catch (err) {
-      console.error('failed loading transaction', err);
-    }
-  };
-
-  const openModal = async () => {
-    setStackParents([{ id: null, label: 'Categories' }]);
-    await loadCategories(null);
-    setCatModalVisible(true);
-  };
-
-  const onPressCategory = async (item: Category) => {
-    try {
-      const children = await CategoryRepo.listByParent(item.id);
-      if (children.length > 0) {
-        setStackParents((s) => [...s, { id: item.id, label: item.label }]);
-        setCategories(children);
-      } else {
-        setSelectedCategory(item);
-        setCatModalVisible(false);
-      }
-    } catch (err) {
-      console.error('error checking children', err);
-      setSelectedCategory(item);
-      setCatModalVisible(false);
-    }
-  };
-
-  const onModalBack = async () => {
-    if (stackParents.length <= 1) {
-      setCatModalVisible(false);
-      return;
-    }
-    const newStack = stackParents.slice(0, -1);
-    const parentEntry = newStack[newStack.length - 1];
-    setStackParents(newStack);
-    await loadCategories(parentEntry.id ?? null);
-  };
-
-  const onChangeDate = (event: any, selected?: Date) => {
-    setShowPicker(Platform.OS === 'ios');
-    if (selected) {
-      setDateMs(selected.getTime());
-    } else if (event?.timestamp) {
-      setDateMs(event.timestamp);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!amount) {
-      Alert.alert('Missing amount', 'Please enter an amount.');
-      return;
-    }
-    const parsed = parseFloat(amount);
-    if (Number.isNaN(parsed)) {
-      Alert.alert('Invalid amount', 'Please enter a valid number for amount.');
-      return;
-    }
-
-    try {
-      // ensure payee exists (normalize)
-      let payeeId: string | undefined = undefined;
-      const name = merchant.trim();
-      if (name) {
-        const p = await TransactionRepo.addPayee({ name });
-        payeeId = p.id;
-      }
-
-      if (editId) {
-        // update existing
-        const a = await TransactionRepo.update(editId, {
-          amount: parsed,
-          comment: notes ?? null,
-          categoryId: selectedCategory?.id ?? null,
-          payeeId: payeeId ?? null,
-          createdAt: dateMs,
-        });
-        // console.log(a);
-      } else {
-        const a = await TransactionRepo.create({
-          amount: parsed,
-          comment: notes ?? null,
-          categoryId: selectedCategory?.id ?? null,
-          payeeId: payeeId ?? null,
-          transaction_type: 'EXPENSE',
-          createdAt: dateMs,
-        });
-        // console.log(a);
-      }
-      navigation.goBack();
-    } catch (err) {
-      console.error('Failed to save transaction', err);
-      Alert.alert('Save failed', 'Unable to save transaction.');
-    }
-  };
+    catModalVisible,
+    openCategoryPicker,
+    closeCategoryPicker,
+    stackParents,
+    categories,
+    selectedCategory,
+    onCategoryPress,
+    onBackStack,
+    loading,
+    handleSave,
+  } = useAddExpense(editId);
 
   return (
-    <SafeAreaView style={isDark ? styles.containerDark : styles.container}>
+    <SafeAreaView style={globalStyle.container}>
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={isDark ? '#0b1226' : '#F7F7FA'}
+        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+        translucent={false}
       />
-
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, isDark ? styles.textDark : undefined]}>
-          {editId ? 'Edit Expense' : 'Add Expense'}
-        </Text>
+      <View style={globalStyle.headerRow}>
+        <Text style={globalStyle.headerTitle}>{editId ? 'Edit expense' : 'Add expense'}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={{ color: schemeColors.muted }}>Close</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.form}>
-        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Merchant / Payee</Text>
+      <View style={s.formInner}>
+        <Text style={s.label}>Merchant</Text>
         <TextInput
-          style={[styles.input, isDark ? styles.inputDark : undefined]}
-          placeholder="e.g. Starbucks"
-          placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
           value={merchant}
           onChangeText={setMerchant}
+          placeholder="Starbucks"
+          placeholderTextColor={schemeColors.muted}
+          style={[globalStyle.searchInput, { marginBottom: 12 }]}
         />
 
-        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Amount</Text>
+        <Text style={s.label}>Amount</Text>
         <TextInput
-          style={[styles.input, isDark ? styles.inputDark : undefined]}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
+          keyboardType="numeric"
           value={amount}
           onChangeText={setAmount}
+          placeholder="0.00"
+          placeholderTextColor={schemeColors.muted}
+          style={[globalStyle.searchInput, { marginBottom: 12 }]}
         />
 
-        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Date</Text>
-        <TouchableOpacity
-          style={[styles.input, styles.pickerTrigger]}
-          onPress={() => setShowPicker(true)}
-        >
-          <Text>{format(new Date(dateMs), 'PP')}</Text>
-        </TouchableOpacity>
-        {showPicker && (
-          <DateTimePicker
-            value={new Date(dateMs)}
-            mode="date"
-            display="default"
-            onChange={onChangeDate}
-            maximumDate={new Date(2100, 0, 1)}
-          />
-        )}
-
-        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Category</Text>
-        <TouchableOpacity onPress={openModal} style={[styles.input, styles.pickerTrigger]}>
-          {selectedCategory ? (
-            <Text>{selectedCategory.label}</Text>
-          ) : (
-            <Text style={{ color: '#6B7280' }}>Select a category</Text>
-          )}
+        <Text style={s.label}>Date</Text>
+        <TouchableOpacity onPress={openDatePicker} style={[globalStyle.searchInput, s.dateButton]}>
+          <Text style={{ color: schemeColors.muted }}>{format(new Date(dateMs), 'PP')}</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.label, isDark ? styles.textDark : undefined]}>Notes</Text>
+        <Text style={s.label}>Notes</Text>
         <TextInput
-          style={[styles.input, styles.multiline, isDark ? styles.inputDark : undefined]}
-          placeholder="Optional notes..."
-          placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
           value={notes}
           onChangeText={setNotes}
-          multiline
+          placeholder="Optional notes"
+          placeholderTextColor={schemeColors.muted}
+          style={[globalStyle.searchInput, { marginBottom: 12 }]}
         />
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveText}>Save</Text>
+        <Text style={s.label}>Category</Text>
+        <TouchableOpacity
+          onPress={openCategoryPicker}
+          style={[
+            globalStyle.searchInput,
+            {
+              paddingVertical: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            },
+          ]}
+        >
+          <Text style={{ color: schemeColors.muted }}>
+            {selectedCategory ? selectedCategory.label : 'Select category'}
+          </Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={schemeColors.muted} />
         </TouchableOpacity>
+        <View style={s.actionsRow}>
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                await handleSave();
+                setTimeout(() => {}, 1000);
+                // go back to the list after successful save
+                navigation.goBack();
+              } catch (err) {
+                // handleSave already alerts on error; swallow here to avoid unhandled rejection
+              }
+            }}
+            style={[globalStyle.addButton, s.saveButton, loading ? { opacity: 0.6 } : undefined]}
+            disabled={loading}
+          >
+            <Text style={globalStyle.addButtonText}>{loading ? 'Saving...' : 'Save'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Category modal - drilldown UI */}
-      <Modal visible={catModalVisible} animationType="slide" transparent>
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.container}>
-            <View style={modalStyles.headerRow}>
-              <TouchableOpacity onPress={onModalBack} style={modalStyles.backButton}>
-                <Text style={{ fontSize: 16 }}>
-                  {stackParents.length > 1 ? '◀ Back' : '✕ Close'}
-                </Text>
-              </TouchableOpacity>
-              <Text style={modalStyles.headerTitle}>
-                {stackParents[stackParents.length - 1]?.label ?? 'Categories'}
-              </Text>
-              <View style={{ width: 64 }} />
-            </View>
+      <CategoryPicker
+        visible={catModalVisible}
+        onRequestClose={closeCategoryPicker}
+        stackParents={stackParents}
+        categories={categories}
+        onBackStack={onBackStack}
+        onCategoryPress={onCategoryPress}
+      />
 
-            <FlatList
-              data={categories}
-              keyExtractor={(i) => i.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => onPressCategory(item)} style={modalStyles.row}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={modalStyles.iconPlaceholder}>
-                      <MaterialCommunityIcons
-                        name={item.icon as any}
-                        size={22}
-                        color={formatColorValue(item.color, '#2563EB')}
-                      />
-                    </View>
-                    <Text style={modalStyles.rowText}>{item.label}</Text>
-                  </View>
-                  <Text style={{ color: '#9CA3AF' }}>{'›'}</Text>
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => (
-                <View style={{ height: 1, backgroundColor: '#EEF2FF' }} />
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+      {showPicker && (
+        <DateTimePicker
+          value={new Date(dateMs)}
+          mode="date"
+          display="default"
+          onChange={onDateChange}
+        />
+      )}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F7FA' },
-  containerDark: { flex: 1, backgroundColor: '#0b1226' },
-  header: { padding: 16, paddingTop: 12 },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
-
-  form: { paddingHorizontal: 16, paddingTop: 8 },
-  label: { marginTop: 12, marginBottom: 6, fontWeight: '600' },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    elevation: 1,
-  },
-  inputDark: { backgroundColor: '#111827', color: '#fff' },
-  pickerTrigger: { justifyContent: 'center', height: 48 },
-  multiline: { height: 80, textAlignVertical: 'top' },
-  saveButton: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  saveText: { color: '#FFF', fontWeight: '700' },
-  textDark: { color: '#fff' },
-});
-
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 20 },
-  container: { backgroundColor: '#fff', borderRadius: 12, maxHeight: '85%', overflow: 'hidden' },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  backButton: { paddingHorizontal: 8, paddingVertical: 6 },
-  headerTitle: { fontSize: 16, fontWeight: '700' },
-
-  row: { padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  iconPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  rowText: { fontSize: 16 },
-});

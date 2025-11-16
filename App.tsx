@@ -1,15 +1,17 @@
 // App.tsx
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import ExpensesListScreen from './src/screens/ExpenseList';
 import AddExpenseScreen from './src/screens/AddExpense';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { runMigrations } from './src/db/migrations';
+import useTheme from './src/hooks/useTheme';
 const Stack = createStackNavigator();
 
 export default function App() {
+  const { schemeColors, scheme, globalStyle } = useTheme();
   useEffect(() => {
     (async () => {
       try {
@@ -21,20 +23,22 @@ export default function App() {
     })();
   }, []);
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <SafeAreaView style={{ flex: 1 }}>
-          <StatusBar style="dark" translucent backgroundColor={'#2564eb91'} />
-          <Stack.Navigator initialRouteName="Expenses" screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Expenses" component={ExpensesListScreen} />
-            <Stack.Screen
-              name="AddExpense"
-              component={AddExpenseScreen}
-              options={{ title: 'Add Expense' }}
-            />
-          </Stack.Navigator>
-        </SafeAreaView>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <NavigationContainer>
+      <SafeAreaView style={globalStyle.container}>
+        <StatusBar
+          style={scheme === 'dark' ? 'light' : 'dark'}
+          translucent
+          backgroundColor={schemeColors.background}
+        />
+        <Stack.Navigator initialRouteName="Expenses" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Expenses" component={ExpensesListScreen} />
+          <Stack.Screen
+            name="AddExpense"
+            component={AddExpenseScreen}
+            options={{ title: 'Add Expense' }}
+          />
+        </Stack.Navigator>
+      </SafeAreaView>
+    </NavigationContainer>
   );
 }

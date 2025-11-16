@@ -85,7 +85,6 @@ export const TransactionRepo = {
       payeeId: r.payeeId ?? null,
       categoryId: r.categoryId ?? null,
       status: r.status ?? null,
-      last_modified: r.last_modified ?? null,
       cr_amount: r.cr_amount ?? null,
       transaction_type: r.transaction_type ?? null,
       createdAt: r.createdAt,
@@ -105,7 +104,6 @@ export const TransactionRepo = {
       payeeId: r.payeeId ?? null,
       categoryId: r.categoryId ?? null,
       status: r.status ?? null,
-      last_modified: r.last_modified ?? null,
       cr_amount: r.cr_amount ?? null,
       transaction_type: r.transaction_type ?? null,
       createdAt: r.createdAt,
@@ -118,7 +116,7 @@ export const TransactionRepo = {
     const now = Date.now();
     const existing = await this.findById(id);
     if (!existing) return null;
-    const merged = { ...existing, ...patch, updatedAt: now, last_modified: now };
+    const merged = { ...existing, ...patch, updatedAt: now };
     await run(
       `UPDATE transactions SET amount = ?, comment = ?, accountId = ?, payeeId = ?, categoryId = ?, status = ?, cr_amount = ?, transaction_type = ?, createdAt = ?, updatedAt = ?, deleted = ? WHERE id = ?`,
       [
@@ -139,9 +137,8 @@ export const TransactionRepo = {
     return merged as Transaction;
   },
 
-  // soft-delete
   async delete(id: string): Promise<void> {
-    await run(`UPDATE transactions SET deleted = 1 WHERE id = ?`, [id]);
+    await run(`DELETE FROM transactions WHERE id = ?`, [id]);
   },
 
   // clone - creates a new transaction copying fields except id and timestamps
@@ -153,7 +150,6 @@ export const TransactionRepo = {
       id: uuidSync(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      last_modified: Date.now(),
     };
     // remove deleted flag
     clone.deleted = 0;
