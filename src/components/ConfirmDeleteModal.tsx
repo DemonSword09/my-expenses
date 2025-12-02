@@ -36,7 +36,7 @@ export default function ConfirmDeleteModal({
 
     // explicitMarkVoid allows buttons to pass explicit choice; otherwise use local state
     const useVoid = typeof explicitMarkVoid === 'boolean' ? explicitMarkVoid : markVoid;
-    console.log(useVoid);
+    // console.log(useVoid);
 
     try {
       if (useVoid) {

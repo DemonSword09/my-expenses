@@ -27,6 +27,8 @@ export async function runMigrations(): Promise<void> {
     //   DROP TABLE categories;
     //   DROP TABLE transactions;
     //   DROP TABLE transfers;
+    //   DROP TABLE templates;
+    //   DROP TABLE recurring_rules;
     //   `);
     await exec(`CREATE TABLE IF NOT EXISTS migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -54,54 +54,54 @@ export default function ActionSheet({
     setConfirmModalVisible(true);
   };
   const onRequestClose = () => setActionModalVisible(false);
-  const modalRow: StyleProp<ViewStyle> = { paddingVertical: 8, flexDirection: 'row' };
+  
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
-      <TouchableOpacity style={globalStyle.modalOverlay} activeOpacity={0} onPress={onRequestClose}>
+      <TouchableOpacity style={globalStyle.modalOverlay} activeOpacity={1} onPress={onRequestClose}>
         <View style={globalStyle.modalSheet}>
           {isVoid ? (
-            <TouchableOpacity onPress={onUndelete} style={modalRow}>
+            <TouchableOpacity onPress={onUndelete} style={globalStyle.modalRow}>
               <MaterialCommunityIcons
                 name="delete-restore"
                 size={22}
-                style={{ color: schemeColors.primary }}
+                color={schemeColors.primary}
               />
-              <Text style={globalStyle.modalRowText}>UnDelete</Text>
+              <Text style={globalStyle.modalRowText}>Restore</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={onEdit} style={modalRow}>
+            <TouchableOpacity onPress={onEdit} style={globalStyle.modalRow}>
               <MaterialCommunityIcons
-                name="cash-edit"
-                size={24}
-                style={{ color: schemeColors.primary }}
+                name="pencil"
+                size={22}
+                color={schemeColors.primary}
               />
               <Text style={globalStyle.modalRowText}>Edit</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity onPress={onClone} style={modalRow}>
+          <TouchableOpacity onPress={onClone} style={globalStyle.modalRow}>
             <MaterialCommunityIcons
               name="content-duplicate"
               size={22}
-              style={{ color: schemeColors.primary }}
+              color={schemeColors.primary}
             />
             <Text style={globalStyle.modalRowText}>Clone</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={onDeleteRequested} style={modalRow}>
+          <TouchableOpacity onPress={onDeleteRequested} style={globalStyle.modalRow}>
             <MaterialCommunityIcons
               name="delete"
               size={22}
-              style={{ color: schemeColors.danger }}
+              color={schemeColors.danger}
             />
             <Text style={[globalStyle.modalRowText, { color: schemeColors.danger }]}>Delete</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={onRequestClose} style={modalRow}>
+          <TouchableOpacity onPress={onRequestClose} style={globalStyle.modalRow}>
             <MaterialCommunityIcons
-              name="cancel"
+              name="close"
               size={22}
-              style={{ color: schemeColors.primary }}
+              color={schemeColors.text}
             />
             <Text style={globalStyle.modalRowText}>Cancel</Text>
           </TouchableOpacity>

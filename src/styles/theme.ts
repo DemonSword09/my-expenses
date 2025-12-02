@@ -5,14 +5,19 @@ export const LIGHT = 'light';
 export const DARK = 'dark';
 
 export const COLORS = {
-  primary: '#2563EB',
-  danger: '#EF4444',
+  primary: '#2F6BFF',
+  primaryLight: '#AFC7FF',
+  danger: '#FF4D4F',
   success: '#10B981',
-  bg: '#F7F7FA',
-  surface: '#FFFFFF',
-  muted: '#9CA3AF',
-  text: '#111827',
-  textMuted: '#6B7280',
+  bg: '#E9ECF4',
+  surface: '#FFFFFF', // Solid white as requested (no rgba)
+  muted: '#9195A1',
+  text: '#111827', // Keep dark text for contrast
+  textMuted: '#64748B',
+  border: '#E1E4EC', // Solid border color
+  divider: '#E1E4EC',
+  
+  // Dark mode placeholders (can be adjusted if dark mode is a priority, but focusing on the requested light theme for now)
   darkBg: '#0b1220',
   darkSurface: '#1b2236',
   white: '#FFFFFF',
@@ -20,17 +25,18 @@ export const COLORS = {
 };
 
 export const SPACING = {
-  xs: 6,
+  xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 24,
+  xl: 20,
+  xxl: 24,
 };
 
 export const RADIUS = {
-  sm: 6,
-  md: 10,
-  lg: 14,
+  sm: 8,
+  md: 12,
+  lg: 16,
 };
 
 export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
@@ -44,6 +50,7 @@ export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
         muted: COLORS.muted,
         text: COLORS.white,
         textMuted: COLORS.muted,
+        border: 'rgba(255,255,255,0.1)',
       }
     : {
         success: COLORS.success,
@@ -54,5 +61,7 @@ export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
         muted: COLORS.muted,
         text: COLORS.text,
         textMuted: COLORS.textMuted,
+        border: COLORS.border,
+        divider: COLORS.divider,
       };
 }

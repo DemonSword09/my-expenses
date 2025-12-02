@@ -10,7 +10,10 @@ import { formatColorValue } from '../utils/colors';
 export interface ExpenseListItemProps {
   item: Transaction;
   onPress?: () => void;
+  onLongPress?: () => void;
   isCompact?: boolean;
+  selectionMode?: boolean;
+  isSelected?: boolean;
 }
 
 /**
@@ -20,7 +23,10 @@ export interface ExpenseListItemProps {
 export default function ExpenseListItem({
   item,
   onPress,
+  onLongPress,
   isCompact = false,
+  selectionMode = false,
+  isSelected = false,
 }: ExpenseListItemProps) {
   const { schemeColors, expenseListStyle } = useTheme();
 
@@ -43,6 +49,7 @@ export default function ExpenseListItem({
   return (
     <TouchableOpacity
       onPress={onPress}
+      onLongPress={onLongPress}
       activeOpacity={0.8}
       style={[
         expenseListStyle.itemContainer,
@@ -51,6 +58,17 @@ export default function ExpenseListItem({
       ]}
     >
       {item.deleted ? <View style={expenseListStyle.deletedLine} /> : null}
+
+      {/* Selection Checkbox */}
+      {selectionMode && (
+        <View style={{ marginRight: 12, justifyContent: 'center' }}>
+          <MaterialCommunityIcons
+            name={isSelected ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+            size={24}
+            color={isSelected ? schemeColors.primary : schemeColors.muted}
+          />
+        </View>
+      )}
 
       <View style={expenseListStyle.categoryRight}>
         {category?.icon ? (

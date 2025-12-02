@@ -4,7 +4,7 @@ import { Platform, Alert } from 'react-native';
 import { CategoryRepo } from '../db/repositories/CategoryRepo';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
 import type { Category, Payee, Transaction } from '../db/models';
-import { first } from '../db/sqlite';
+import { first, all } from '../db/sqlite';
 import { useNavigation } from '@react-navigation/native';
 
 type UseAddExpenseReturn = {
@@ -33,9 +33,11 @@ type UseAddExpenseReturn = {
   loading: boolean;
 
   handleSave: () => Promise<void>;
+  payees: Payee[];
+  onMerchantSelect: (p: Payee) => void;
 };
 
-export default function useAddExpense(editId?: string | undefined): UseAddExpenseReturn {
+export default function useAddExpense(editId?: string | undefined, initialData?: any): UseAddExpenseReturn {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -97,8 +99,41 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
       (async () => {
         await loadTransaction(editId);
       })();
+    } else if (initialData) {
+      // initialize from passed data (e.g. template)
+      if (initialData.amount) setAmount(String(initialData.amount));
+      if (initialData.comment) setNotes(initialData.comment);
+      if (initialData.merchant) setMerchant(initialData.merchant); // if template has merchant field?
+      // Template might store merchant in 'payee' or similar?
+      // The user said "template json form".
+      // Let's assume the template object structure matches what we need or we map it.
+      // In TemplateEditor, initial.template is passed.
+      
+      // If initialData has categoryId, we might need to load it?
+      // But we can just set selectedCategory if we have the full object, or load it if we only have ID.
+      // TemplateEditor passes `template` which might have `categoryId`.
+      if (initialData.categoryId) {
+         // we need to load the category object to set selectedCategory
+         (async () => {
+            const cat = await CategoryRepo.findById(initialData.categoryId);
+            if (cat) setSelectedCategory(cat);
+         })();
+      }
+      
+      // For merchant, if it's just a string in template, use it.
+      // If it's a payeeId, we might need to load it.
+      // But templates usually store the raw values for simplicity?
+      // Let's assume 'merchant' property exists or we check 'payee_name' etc.
+      if (initialData.merchant) setMerchant(initialData.merchant);
+    } else {
+      // reset to defaults if no editId and no initialData (e.g. creating new)
+      setAmount('');
+      setMerchant('');
+      setNotes('');
+      setSelectedCategory(null);
+      setDateMs(Date.now());
     }
-  }, [editId, loadTransaction]);
+  }, [editId, loadTransaction, initialData]);
 
   const openCategoryPicker = useCallback(async () => {
     setStackParents([{ id: null, label: 'Categories' }]);
@@ -138,6 +173,28 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
     setCatModalVisible(false);
   }, []);
 
+  const onMerchantSelect = useCallback(async (payee: Payee) => {
+    setMerchant(payee.name);
+    
+    // Auto-populate from last transaction for this payee
+    if (!editId) {
+      try {
+        const lastTxn = await TransactionRepo.getLastByPayee(payee.id);
+        if (lastTxn) {
+          setAmount(String(lastTxn.amount));
+          if (lastTxn.comment) setNotes(lastTxn.comment);
+          
+          if (lastTxn.categoryId) {
+             const cat = await CategoryRepo.findById(lastTxn.categoryId);
+             if (cat) setSelectedCategory(cat);
+          }
+        }
+      } catch (err) {
+        console.error('useAddExpense: failed auto-populating from merchant', err);
+      }
+    }
+  }, [editId]);
+
   const onBackStack = useCallback(async () => {
     setStackParents((prev) => {
       if (prev.length <= 1) {
@@ -157,6 +214,20 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
     setShowPicker(Platform.OS === 'ios');
     if (d) setDateMs(d.getTime());
   }, []);
+  
+  const [payees, setPayees] = useState<Payee[]>([]);
+
+  // load payees for autocomplete
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await all<Payee>('SELECT * FROM payees ORDER BY name COLLATE NOCASE ASC');
+        setPayees(rows || []);
+      } catch (err) {
+        console.error('useAddExpense: failed loading payees', err);
+      }
+    })();
+  }, []);
 
   const handleSave = useCallback(async () => {
     setLoading(true);
@@ -165,10 +236,18 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
       if (Number.isNaN(parsed) || parsed <= 0) {
         throw new Error('Invalid amount');
       }
+
+      let payeeId: string | null = null;
+      if (merchant.trim()) {
+        const p = await TransactionRepo.addPayee({ name: merchant.trim() });
+        payeeId = p.id;
+      }
+
       const payload: Partial<Transaction> = {
         amount: parsed,
         comment: notes || null,
         categoryId: selectedCategory ? selectedCategory.id : null,
+        payeeId,
         createdAt: dateMs,
         transaction_type: 'EXPENSE',
       };
@@ -195,7 +274,7 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
     } finally {
       setLoading(false);
     }
-  }, [amount, notes, selectedCategory, dateMs, editId]);
+  }, [amount, notes, selectedCategory, dateMs, editId, merchant]);
 
   return {
     merchant,
@@ -221,7 +300,9 @@ export default function useAddExpense(editId?: string | undefined): UseAddExpens
     onBackStack,
 
     loading,
+    payees,
+    onMerchantSelect,
 
     handleSave,
-  } as UseAddExpenseReturn;
+  } as UseAddExpenseReturn & { payees: Payee[], onMerchantSelect: (p: Payee) => void };
 }

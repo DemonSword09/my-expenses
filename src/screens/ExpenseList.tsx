@@ -1,6 +1,6 @@
 // src/screens/ExpenseList.tsx
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, TextInput, Alert } from 'react-native';
 import type { Transaction, Category } from '../db/models';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -9,7 +9,9 @@ import ExpenseListItem from '../components/ExpenseListItem';
 import ActionSheet from '@src/components/ActionSheet';
 import ConfirmDeleteModal from '@src/components/ConfirmDeleteModal';
 import useExpenses from '@src/hooks/useExpenses';
-
+import { Appbar } from 'react-native-paper';
+import { exec, first, run } from '@src/db/sqlite';
+import { TransactionRepo } from '@src/db/repositories/TransactionRepo';
 type FilterMode = 'all' | 'week' | 'month';
 
 export default function ExpenseListScreen() {
@@ -34,6 +36,10 @@ export default function ExpenseListScreen() {
     setQuery,
   } = useExpenses();
 
+  // selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   useFocusEffect(
     useCallback(() => {
       (async () => {
@@ -45,7 +51,12 @@ export default function ExpenseListScreen() {
 
   const onRefresh = useCallback(async () => {
     refresh();
-  }, [load, loadLookups]);
+    // exit selection mode on refresh
+    if (selectionMode) {
+      setSelectionMode(false);
+      setSelectedIds(new Set());
+    }
+  }, [load, loadLookups, selectionMode]);
 
   // PREPARE transactions with resolved metadata once (performance)
   const preparedTransactions = useMemo(() => {
@@ -72,55 +83,161 @@ export default function ExpenseListScreen() {
     setActionModalVisible(true);
   };
 
+  const toggleSelection = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+      if (next.size === 0) {
+        setSelectionMode(false);
+      }
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const onLongPressItem = (t: Transaction) => {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedIds(new Set([t.id]));
+    } else {
+      toggleSelection(t.id);
+    }
+  };
+
+  const onPressItem = (t: Transaction) => {
+    if (selectionMode) {
+      toggleSelection(t.id);
+    } else {
+      onOpenActions(t);
+    }
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const confirmBulkDelete = () => {
+    Alert.alert(
+      'Delete Transactions',
+      `Are you sure you want to delete ${selectedIds.size} transactions?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await TransactionRepo.deleteMultiple(Array.from(selectedIds));
+              await load();
+              exitSelectionMode();
+            } catch (err) {
+              console.error('Bulk delete failed', err);
+              Alert.alert('Error', 'Failed to delete transactions.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  let totalBalance = 0;
+  preparedTransactions.forEach((t) => {
+    if (t.transaction_type == 'EXPENSE') totalBalance -= t.amount;
+    else totalBalance += t.amount;
+  });
+
   const renderItem = ({ item }: { item: Transaction & any }) => {
     // item already has __category/__heading/__payeeName attached
-    return <ExpenseListItem item={item} onPress={() => onOpenActions(item)} />;
+    return (
+      <ExpenseListItem
+        item={item}
+        onPress={() => onPressItem(item)}
+        onLongPress={() => onLongPressItem(item)}
+        selectionMode={selectionMode}
+        isSelected={selectedIds.has(item.id)}
+      />
+    );
   };
 
   return (
     <View style={expenseListStyle.container}>
-      <View style={globalStyle.headerRow}>
-        <Text style={globalStyle.headerTitle}>Expenses</Text>
-        <TouchableOpacity
-          style={globalStyle.addButton}
-          onPress={() => (navigation as any).navigate('AddExpense')}
-        >
-          <Text style={globalStyle.addButtonText}>+ Add</Text>
-        </TouchableOpacity>
-      </View>
+      <Appbar.Header style={{ backgroundColor: schemeColors.background }}>
+        {selectionMode ? (
+          <>
+            <Appbar.Action icon="close" onPress={exitSelectionMode} color={schemeColors.text} />
+            <Appbar.Content
+              title={`${selectedIds.size} selected`}
+              titleStyle={{ fontWeight: 'bold', color: schemeColors.text }}
+            />
+            <Appbar.Action icon="trash-can-outline" onPress={confirmBulkDelete} color={schemeColors.danger} />
+          </>
+        ) : (
+          <>
+            <Appbar.Action icon="menu" color={schemeColors.primary} onPress={() => {}} />
+            <Appbar.Content
+              title={
+                <View>
+                  <Text style={{ fontWeight: 'bold', fontSize: 18, color: schemeColors.text }}>
+                    Expenses
+                  </Text>
+                  <Text
+                    style={{
+                      color: totalBalance < 0 ? schemeColors.danger : schemeColors.success,
+                      fontSize: 14,
+                    }}
+                  >
+                    {' '}
+                    ₹{totalBalance}
+                  </Text>
+                </View>
+              }
+            />
+            <Appbar.Action
+              color={schemeColors.primary}
+              icon="bookmark-multiple"
+              onPress={() => navigation.navigate('Templates')}
+            />
+            <Appbar.Action color={schemeColors.primary} icon="dots-vertical" onPress={() => {}} />
+          </>
+        )}
+      </Appbar.Header>
+      
+      {/* Search + filters - hide in selection mode? or keep? Keeping for now but maybe disable input */}
+      {!selectionMode && (
+        <View style={globalStyle.searchBlock}>
+          <TextInput
+            placeholder="Search payee, category, notes"
+            placeholderTextColor={schemeColors.muted}
+            value={query}
+            onChangeText={setQuery}
+            style={globalStyle.searchInput}
+          />
 
-      {/* Search + filters */}
-      <View style={globalStyle.searchBlock}>
-        <TextInput
-          placeholder="Search payee, category, notes"
-          placeholderTextColor={schemeColors.muted}
-          value={query}
-          onChangeText={setQuery}
-          style={globalStyle.searchInput}
-        />
-
-        <View style={globalStyle.filtersRow}>
-          {(['all', 'week', 'month'] as FilterMode[]).map((f) => (
-            <TouchableOpacity
-              key={f}
-              onPress={() => setFilter(f)}
-              style={[
-                globalStyle.filterPill,
-                filter === f ? globalStyle.filterPillActive : undefined,
-              ]}
-            >
-              <Text
+          <View style={globalStyle.filtersRow}>
+            {(['all', 'week', 'month'] as FilterMode[]).map((f) => (
+              <TouchableOpacity
+                key={f}
+                onPress={() => setFilter(f)}
                 style={[
-                  globalStyle.filterText,
-                  filter === f ? globalStyle.filterTextActive : undefined,
+                  globalStyle.filterPill,
+                  filter === f ? globalStyle.filterPillActive : undefined,
                 ]}
               >
-                {f === 'all' ? 'All' : f === 'week' ? 'Last 7d' : 'Last 30d'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    globalStyle.filterText,
+                    filter === f ? globalStyle.filterTextActive : undefined,
+                  ]}
+                >
+                  {f === 'all' ? 'All' : f === 'week' ? 'Last 7d' : 'Last 30d'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       <FlatList
         data={preparedTransactions}
@@ -135,12 +252,14 @@ export default function ExpenseListScreen() {
         }
       />
 
-      <TouchableOpacity
-        style={globalStyle.fab}
-        onPress={() => (navigation as any).navigate('AddExpense')}
-      >
-        <Text style={globalStyle.fabText}>+</Text>
-      </TouchableOpacity>
+      {!selectionMode && (
+        <TouchableOpacity
+          style={globalStyle.fab}
+          onPress={() => (navigation as any).navigate('AddExpense')}
+        >
+          <Text style={globalStyle.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
 
       <ActionSheet
         onRefresh={onRefresh}

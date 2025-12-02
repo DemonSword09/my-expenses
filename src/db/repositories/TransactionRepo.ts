@@ -76,7 +76,7 @@ export const TransactionRepo = {
   },
 
   async listAll(): Promise<Transaction[]> {
-    const rows = await all<any>('SELECT * FROM transactions ORDER BY createdAt DESC');
+    const rows = await all<any>('SELECT * FROM transactions WHERE deleted = 0 ORDER BY createdAt DESC');
     return (rows || []).map((r: any) => ({
       id: r.id,
       amount: r.amount,
@@ -141,6 +141,12 @@ export const TransactionRepo = {
     await run(`DELETE FROM transactions WHERE id = ?`, [id]);
   },
 
+  async deleteMultiple(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    await run(`DELETE FROM transactions WHERE id IN (${placeholders})`, ids);
+  },
+
   // clone - creates a new transaction copying fields except id and timestamps
   async clone(id: string): Promise<Transaction | null> {
     const existing = await this.findById(id);
@@ -172,5 +178,49 @@ export const TransactionRepo = {
     await run(`INSERT OR IGNORE INTO payees (id, name) VALUES (?, ?)`, [id, name]);
 
     return { id, name } as Payee;
+  },
+
+  async getLastByCategory(categoryId: string): Promise<Transaction | null> {
+    const r = await first<any>(
+      `SELECT * FROM transactions WHERE categoryId = ? AND transaction_type = 'EXPENSE' AND deleted = 0 ORDER BY createdAt DESC LIMIT 1`,
+      [categoryId],
+    );
+    if (!r) return null;
+    return {
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+    } as Transaction;
+  },
+
+  async getLastByPayee(payeeId: string): Promise<Transaction | null> {
+    const r = await first<any>(
+      `SELECT * FROM transactions WHERE payeeId = ? AND transaction_type = 'EXPENSE' AND deleted = 0 ORDER BY createdAt DESC LIMIT 1`,
+      [payeeId],
+    );
+    if (!r) return null;
+    return {
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+    } as Transaction;
   },
 };

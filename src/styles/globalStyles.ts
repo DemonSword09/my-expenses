@@ -1,5 +1,5 @@
 // src/styles/globalStyles.ts
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { getThemeColors, SPACING, RADIUS, COLORS } from './theme';
 
 export const globalStyles = (scheme: any) => {
@@ -20,13 +20,15 @@ export const globalStyles = (scheme: any) => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: SPACING.lg,
-      paddingTop: SPACING.md,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      height: 64, // Standardize header height
     },
     headerTitle: {
-      fontSize: 22,
-      fontWeight: '700',
+      fontSize: 20,
+      fontWeight: '600',
       color: schemeColors.text,
+      textAlign: 'center',
     },
 
     // buttons / quick-add
@@ -112,6 +114,129 @@ export const globalStyles = (scheme: any) => {
       height: 2,
       backgroundColor: schemeColors.danger,
       zIndex: 10,
+    },
+
+    // form styles
+    formContainer: {
+      flex: 1,
+      padding: 20,
+    },
+    formSection: {
+      backgroundColor: schemeColors.surface,
+      borderRadius: RADIUS.lg,
+      marginBottom: 20,
+      shadowColor: schemeColors.primary, // Glow color
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15, // Glow intensity
+      shadowRadius: 12, // Glow diffusion
+      elevation: 4,
+      borderWidth: 1,
+      borderColor: schemeColors.border,
+      overflow: Platform.OS === 'android' ? 'hidden' : 'visible', 
+    },
+    formRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: schemeColors.divider, // Use divider color
+      minHeight: 56,
+    },
+    formRowLast: {
+      borderBottomWidth: 0,
+    },
+    formLabel: {
+      fontSize: 16,
+      width: 100,
+      color: schemeColors.text,
+      fontWeight: '500',
+    },
+    formInput: {
+      flex: 1,
+      fontSize: 16,
+      color: schemeColors.text,
+      textAlign: 'right',
+    },
+    formValue: {
+      flex: 1,
+      fontSize: 16,
+      color: schemeColors.text,
+      textAlign: 'right',
+    },
+
+    // row styles (for settings-style lists)
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: schemeColors.border,
+    },
+    rowLabel: {
+      fontSize: 16,
+      width: 100,
+      color: schemeColors.text,
+      fontWeight: '500',
+    },
+    rowInput: {
+      flex: 1,
+      fontSize: 16,
+      color: schemeColors.text,
+      textAlign: 'right',
+    },
+    rowValue: {
+      flex: 1,
+      fontSize: 16,
+      color: schemeColors.text,
+      textAlign: 'right',
+    },
+    rowPlaceholder: {
+      color: schemeColors.muted,
+    },
+
+    // section header
+    sectionHeader: {
+      fontSize: 12,
+      fontWeight: '500',
+      marginBottom: 8,
+      marginTop: 20,
+      marginLeft: 20, // Align with card padding
+      textTransform: 'uppercase',
+      color: '#7C8395',
+      letterSpacing: 1,
+    },
+
+    // buttons
+    primaryButton: {
+      backgroundColor: schemeColors.primary,
+      height: 52,
+      borderRadius: RADIUS.md, // 12px
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: schemeColors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    primaryButtonText: {
+      color: colors.white,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    secondaryButton: {
+      backgroundColor: schemeColors.surface,
+      height: 52,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: schemeColors.border,
+    },
+    secondaryButtonText: {
+      color: schemeColors.text,
+      fontSize: 16,
+      fontWeight: '600',
     },
 
     // modal sheet (action sheet / confirm)
