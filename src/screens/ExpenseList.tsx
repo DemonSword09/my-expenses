@@ -1,6 +1,6 @@
 // src/screens/ExpenseList.tsx
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, TextInput, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, TextInput, Alert, Modal, StyleSheet } from 'react-native';
 import type { Transaction, Category } from '../db/models';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
@@ -10,8 +10,14 @@ import ActionSheet from '@src/components/ActionSheet';
 import ConfirmDeleteModal from '@src/components/ConfirmDeleteModal';
 import useExpenses from '@src/hooks/useExpenses';
 import { Appbar } from 'react-native-paper';
-import { exec, first, run } from '@src/db/sqlite';
 import { TransactionRepo } from '@src/db/repositories/TransactionRepo';
+import CategoryPicker from '@src/components/CategoryPicker';
+import PayeePicker from '@src/components/PayeePicker';
+import { CategoryRepo } from '@src/db/repositories/CategoryRepo';
+
+import { CsvHelper } from '@src/utils/CsvHelper';
+
+
 type FilterMode = 'all' | 'week' | 'month';
 
 export default function ExpenseListScreen() {
@@ -21,6 +27,19 @@ export default function ExpenseListScreen() {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const openMenu = () => setMenuVisible(true);
+  const closeMenu = () => setMenuVisible(false);
+
+  const handleExport = async () => {
+    closeMenu();
+  };
+
+  const handleImport = async () => {
+    closeMenu();
+    navigation.navigate('ImportCsv');
+  };
   const {
     load,
     filter,
@@ -34,11 +53,91 @@ export default function ExpenseListScreen() {
     resolveCategoryHeading,
     setFilter,
     setQuery,
+    categoriesMap,
   } = useExpenses();
 
   // selection state
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // bulk edit state
+  // bulk edit state
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+  const [payeePickerVisible, setPayeePickerVisible] = useState(false);
+  
+  // Hierarchical picker state
+  const [pickerCategories, setPickerCategories] = useState<Category[]>([]);
+  const [pickerStackParents, setPickerStackParents] = useState<Array<{ id: string | null; label?: string }>>([
+    { id: null, label: 'Categories' },
+  ]);
+
+  const handleBulkCategory = async (c: Category) => {
+    try {
+        await TransactionRepo.updateCategoryForMultiple(Array.from(selectedIds), c.id);
+        setCategoryPickerVisible(false);
+        exitSelectionMode();
+        refresh();
+    } catch (err) {
+        console.error('Bulk category update failed', err);
+        Alert.alert('Error', 'Failed to update category');
+    }
+  };
+
+  const handleBulkPayee = async (p: {id: string}) => {
+     try {
+        await TransactionRepo.updatePayeeForMultiple(Array.from(selectedIds), p.id);
+        setPayeePickerVisible(false);
+        exitSelectionMode();
+        refresh();
+     } catch (err) {
+        console.error('Bulk payee update failed', err);
+        Alert.alert('Error', 'Failed to update payee');
+     }
+  };
+
+  const loadPickerCategories = useCallback(async (parentId: string | null) => {
+    try {
+        const rows = await CategoryRepo.listByParent(parentId);
+        setPickerCategories(rows);
+    } catch (err) {
+        console.error('ExpenseList: failed loading picker categories', err);
+        setPickerCategories([]);
+    }
+  }, []);
+
+  const openCategoryPicker = useCallback(() => {
+    setPickerStackParents([{ id: null, label: 'Categories' }]);
+    loadPickerCategories(null);
+    setCategoryPickerVisible(true);
+  }, [loadPickerCategories]);
+
+  const onPickerCategoryPress = useCallback(async (cat: Category) => {
+    try {
+        const children = await CategoryRepo.listByParent(cat.id);
+        if (children && children.length > 0) {
+            setPickerStackParents((p) => [...p, { id: cat.id, label: cat.label }]);
+            setPickerCategories(children);
+        } else {
+            handleBulkCategory(cat);
+        }
+    } catch (err) {
+        console.error('ExpenseList: failed resolving children', err);
+        handleBulkCategory(cat);
+    }
+  }, [handleBulkCategory]);
+
+  const onPickerBackStack = useCallback(() => {
+    setPickerStackParents((prev) => {
+        if (prev.length <= 1) {
+            setCategoryPickerVisible(false);
+            return prev;
+        }
+        const next = prev.slice(0, prev.length - 1);
+        const parentId = next[next.length - 1].id ?? null;
+        loadPickerCategories(parentId);
+        return next;
+    });
+  }, [loadPickerCategories]);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,6 +241,8 @@ export default function ExpenseListScreen() {
     );
   };
 
+
+
   let totalBalance = 0;
   preparedTransactions.forEach((t) => {
     if (t.transaction_type == 'EXPENSE') totalBalance -= t.amount;
@@ -171,6 +272,8 @@ export default function ExpenseListScreen() {
               title={`${selectedIds.size} selected`}
               titleStyle={{ fontWeight: 'bold', color: schemeColors.text }}
             />
+            <Appbar.Action icon="tag-multiple" onPress={openCategoryPicker} color={schemeColors.primary} />
+            <Appbar.Action icon="account-multiple" onPress={() => setPayeePickerVisible(true)} color={schemeColors.primary} />
             <Appbar.Action icon="trash-can-outline" onPress={confirmBulkDelete} color={schemeColors.danger} />
           </>
         ) : (
@@ -197,14 +300,33 @@ export default function ExpenseListScreen() {
             <Appbar.Action
               color={schemeColors.primary}
               icon="bookmark-multiple"
-              onPress={() => navigation.navigate('Templates')}
+              onPress={() => navigation.navigate('Templates' as never)}
             />
-            <Appbar.Action color={schemeColors.primary} icon="dots-vertical" onPress={() => {}} />
+            <Appbar.Action color={schemeColors.primary} icon="dots-vertical" onPress={openMenu} />
+            
+             <Modal
+              transparent
+              visible={menuVisible}
+              animationType="fade"
+              onRequestClose={closeMenu}
+            >
+              <TouchableOpacity style={expenseListStyle.modalOverlay} activeOpacity={1} onPress={closeMenu}>
+                <View style={[expenseListStyle.menuContainer, { backgroundColor: schemeColors.surface }]}>
+                  <TouchableOpacity style={expenseListStyle.menuItem} onPress={handleExport}>
+                    <Text style={[expenseListStyle.menuText, { color: schemeColors.text }]}>Export CSV</Text>
+                  </TouchableOpacity>
+                  <View style={{ height: 1, backgroundColor: schemeColors.border }} />
+                  <TouchableOpacity style={expenseListStyle.menuItem} onPress={handleImport}>
+                    <Text style={[expenseListStyle.menuText, { color: schemeColors.text }]}>Import CSV</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </Modal>
           </>
         )}
       </Appbar.Header>
       
-      {/* Search + filters - hide in selection mode? or keep? Keeping for now but maybe disable input */}
+      {/* Search + filters  */}
       {!selectionMode && (
         <View style={globalStyle.searchBlock}>
           <TextInput
@@ -269,7 +391,6 @@ export default function ExpenseListScreen() {
         activeTransaction={activeTransaction}
       />
 
-      {/* Confirm delete / mark-void modal */}
       <ConfirmDeleteModal
         onRefresh={onRefresh}
         activeTransaction={activeTransaction}
@@ -278,6 +399,22 @@ export default function ExpenseListScreen() {
         setConfirmModalVisible={setConfirmModalVisible}
         onCancel={() => setConfirmModalVisible(false)}
         visible={confirmModalVisible}
+      />
+
+      <CategoryPicker
+        visible={categoryPickerVisible}
+        onRequestClose={() => setCategoryPickerVisible(false)}
+        categories={pickerCategories}
+        stackParents={pickerStackParents}
+        onBackStack={onPickerBackStack}
+        onCategoryPress={onPickerCategoryPress}
+      />
+
+      <PayeePicker
+        visible={payeePickerVisible}
+        onRequestClose={() => setPayeePickerVisible(false)}
+        payees={Object.values(payeesMap).map((name, idx) => ({ id: Object.keys(payeesMap)[idx], name: name as string }))}
+        onPayeePress={handleBulkPayee}
       />
     </View>
   );

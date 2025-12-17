@@ -1,5 +1,31 @@
 // src/db/models.ts
 export type UUID = string;
+export type CsvRow = Record<string, string>
+
+export type AppField =
+  | 'date'
+  | 'amount'
+  | 'type'
+  | 'category'
+  | 'subcategory'
+  | 'payee'
+  | 'notes'
+  | 'account'
+  | 'ignore'
+
+export interface ColumnMapping {
+  csvColumn: string
+  appField: AppField
+  dateFormat?: string
+}
+
+export interface ImportConfig {
+  mappings: ColumnMapping[]
+  dateFormat: string
+  createMissingCategories: boolean
+  createMissingPayees: boolean
+}
+
 
 export interface Account {
   id: UUID;
@@ -40,6 +66,7 @@ export interface Transaction {
   createdAt: number; // unix ms - this is the effective 'date' of the transaction
   updatedAt?: number | null; // last modified
   deleted?: 0 | 1;
+  recurring_rule_id?: string | null;
 }
 
 export interface Transfer {
@@ -50,7 +77,6 @@ export interface Transfer {
 export interface Template {
   id: string;
   name: string;
-  description?: string | null;
   template_json: string; // JSON string of Partial<Transaction>
   is_recurring: 0 | 1;
   recurring_rule_id?: string | null;

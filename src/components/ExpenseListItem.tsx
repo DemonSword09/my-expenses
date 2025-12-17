@@ -97,7 +97,7 @@ export default function ExpenseListItem({
 
       <View style={expenseListStyle.itemRight}>
         <Text style={[expenseListStyle.itemAmount, { color: amountColor }]}>
-          {`${amountSign}${formatCurrency(item.amount)}`}
+          {`${amountSign}${formatCurrency(Math.abs(item.amount))}`}
         </Text>
         <Text style={expenseListStyle.itemDate}>{format(date, 'PP')}</Text>
       </View>

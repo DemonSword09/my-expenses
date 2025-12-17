@@ -161,7 +161,7 @@ export const CATEGORY_SEED = [
     icon: 'cash',
     type: 'expense',
     subcategories: [
-      { name: 'Loan/Mortgage', icon: 'home-currency-usd' },
+      { name: 'Loan/Mortgage', icon: 'home-analytics' },
       { name: 'Refunding', icon: 'cash-refund' },
       { name: 'Misc. income', icon: 'cash' },
       { name: 'Cashback', icon: 'cash-plus' },
@@ -267,7 +267,7 @@ export const CATEGORY_SEED = [
     type: 'expense',
     subcategories: [
       { name: 'Books', icon: 'book' },
-      { name: 'Lessons', icon: 'teach' },
+      { name: 'Lessons', icon: 'human-male-board' },
       { name: 'School fees', icon: 'cash' },
     ],
   },

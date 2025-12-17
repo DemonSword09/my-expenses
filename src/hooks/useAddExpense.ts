@@ -14,6 +14,8 @@ type UseAddExpenseReturn = {
   setAmount: (v: string) => void;
   notes: string;
   setNotes: (v: string) => void;
+  transactionType: 'EXPENSE' | 'INCOME';
+  setTransactionType: (v: 'EXPENSE' | 'INCOME') => void;
 
   dateMs: number;
   showPicker: boolean;
@@ -35,12 +37,14 @@ type UseAddExpenseReturn = {
   handleSave: () => Promise<void>;
   payees: Payee[];
   onMerchantSelect: (p: Payee) => void;
+  reset: () => void;
 };
 
 export default function useAddExpense(editId?: string | undefined, initialData?: any): UseAddExpenseReturn {
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
 
   const [catModalVisible, setCatModalVisible] = useState(false);
   const [stackParents, setStackParents] = useState<Array<{ id: string | null; label?: string }>>([
@@ -69,7 +73,30 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     try {
       const t = await TransactionRepo.findById(id);
       if (!t) return;
-      setAmount(String(t.amount));
+      
+      // Determine type and absolute amount
+      // If transaction_type is set, use it.
+      // If not, infer from amount sign?
+      // Existing data might be positive for expense if that was the old way.
+      // The user said "default expense".
+      // Let's check if we have `transaction_type` column. Yes, we do.
+      // If `transaction_type` is 'EXPENSE' or null, and amount is positive, we might need to flip it if we want to enforce negative for expense.
+      // BUT, if we are changing the storage convention, we should be careful.
+      // The user said "if expense entered amount is negative".
+      // This implies we should store negative for expense.
+      
+      let type: 'EXPENSE' | 'INCOME' = 'EXPENSE';
+      if (t.transaction_type === 'INCOME') type = 'INCOME';
+      else if (t.amount > 0 && t.transaction_type !== 'EXPENSE') {
+        // If amount is positive and type is not explicitly expense, maybe it's income?
+        // Or maybe it's an old expense stored as positive.
+        // Let's rely on `transaction_type` if present.
+        // If not present, default to EXPENSE.
+      }
+      
+      // If we are enforcing negative for expense, we should display absolute value.
+      setTransactionType(type);
+      setAmount(String(Math.abs(t.amount)));
       setNotes(t.comment ?? '');
       setDateMs(t.createdAt ?? Date.now());
       if (t.categoryId) {
@@ -125,6 +152,41 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       // But templates usually store the raw values for simplicity?
       // Let's assume 'merchant' property exists or we check 'payee_name' etc.
       if (initialData.merchant) setMerchant(initialData.merchant);
+      
+      // Initialize transaction type
+      if (initialData.transaction_type) {
+        setTransactionType(initialData.transaction_type === 'INCOME' ? 'INCOME' : 'EXPENSE');
+      } else if (initialData.amount && Number(initialData.amount) > 0) {
+         // If positive amount and no type specified, might be income? 
+         // But existing logic stores expenses as positive too? 
+         // Wait, the plan said "Expense: Amount is stored as negative".
+         // But currently `useAddExpense` stores `amount: parsed`.
+         // Let's check `handleSave` again.
+         // `handleSave` currently does `amount: parsed`.
+         // If I change `handleSave` to flip sign, then here I should check sign.
+         // If existing data is positive for expense, then I need to be careful.
+         // The user said "if expense entered amount is negative".
+         // Wait, "if expense entered amount is negative" - this might mean the user wants to enter negative?
+         // No, "if expense entered amount is negative" probably means "if expense, make it negative".
+         // "if income possitive".
+         
+         // Let's assume standard behavior:
+         // Expense: User enters 100 -> DB stores -100.
+         // Income: User enters 100 -> DB stores 100.
+         
+         // So if I load a transaction:
+         // If amount < 0 -> Expense (and show positive in input).
+         // If amount > 0 -> Income.
+         
+         const amt = Number(initialData.amount);
+         if (amt < 0) {
+           setTransactionType('EXPENSE');
+           setAmount(String(Math.abs(amt)));
+         } else {
+           setTransactionType('INCOME');
+           setAmount(String(amt));
+         }
+      }
     } else {
       // reset to defaults if no editId and no initialData (e.g. creating new)
       setAmount('');
@@ -132,6 +194,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       setNotes('');
       setSelectedCategory(null);
       setDateMs(Date.now());
+      setTransactionType('EXPENSE');
     }
   }, [editId, loadTransaction, initialData]);
 
@@ -237,6 +300,9 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         throw new Error('Invalid amount');
       }
 
+      // Apply sign based on type
+      const finalAmount = transactionType === 'EXPENSE' ? -Math.abs(parsed) : Math.abs(parsed);
+
       let payeeId: string | null = null;
       if (merchant.trim()) {
         const p = await TransactionRepo.addPayee({ name: merchant.trim() });
@@ -244,22 +310,23 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       }
 
       const payload: Partial<Transaction> = {
-        amount: parsed,
+        amount: finalAmount,
         comment: notes || null,
         categoryId: selectedCategory ? selectedCategory.id : null,
         payeeId,
         createdAt: dateMs,
-        transaction_type: 'EXPENSE',
+        transaction_type: transactionType,
       };
 
       if (editId) {
         if ((TransactionRepo as any).update) {
           await (TransactionRepo as any).update(editId, {
-            amount: parsed,
+            amount: finalAmount,
             comment: notes || null,
             categoryId: selectedCategory ? selectedCategory.id : null,
             createdAt: dateMs,
             updatedAt: Date.now(),
+            transaction_type: transactionType,
           });
         } else {
           await TransactionRepo.create({ ...payload, id: editId });
@@ -283,6 +350,8 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     setAmount,
     notes,
     setNotes,
+    transactionType,
+    setTransactionType,
 
     dateMs,
     showPicker,
@@ -304,5 +373,13 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     onMerchantSelect,
 
     handleSave,
-  } as UseAddExpenseReturn & { payees: Payee[], onMerchantSelect: (p: Payee) => void };
+    reset: () => {
+      setAmount('');
+      setMerchant('');
+      setNotes('');
+      setSelectedCategory(null);
+      setDateMs(Date.now());
+      setTransactionType('EXPENSE');
+    }
+  } as UseAddExpenseReturn & { payees: Payee[], onMerchantSelect: (p: Payee) => void, reset: () => void };
 }

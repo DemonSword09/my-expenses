@@ -6,19 +6,17 @@ import { uuidSync } from '@src/utils/uuid';
 export const TemplateRepo = {
   async createTemplate(payload: {
     name: string;
-    description?: string | null;
     template: Record<string, any>;
     is_recurring?: boolean;
     recurring_rule_id?: string | null;
   }): Promise<string> {
     const id = uuidSync();
     const now = Date.now();
-    const stmt = `INSERT INTO templates (id, name, description, template_json, is_recurring, recurring_rule_id, created_at, updated_at)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    const stmt = `INSERT INTO templates (id, name, template_json, is_recurring, recurring_rule_id, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)`;
     await run(stmt, [
       id,
       payload.name,
-      payload.description ?? null,
       JSON.stringify(payload.template),
       payload.is_recurring ? 1 : 0,
       payload.recurring_rule_id ?? null,
@@ -56,10 +54,6 @@ export const TemplateRepo = {
       fields.push('name = ?');
       values.push(patch.name);
     }
-    if (patch.description !== undefined) {
-      fields.push('description = ?');
-      values.push(patch.description);
-    }
     if (patch.template_json !== undefined) {
       fields.push('template_json = ?');
       values.push(patch.template_json);
@@ -81,7 +75,11 @@ export const TemplateRepo = {
   },
 
   async deleteTemplate(id: string) {
+    const template = await this.findTemplateById(id);
     await run(`DELETE FROM templates WHERE id = ?`, [id]);
+    if (template?.recurring_rule_id) {
+      await run(`DELETE FROM recurring_rules WHERE id = ?`, [template.recurring_rule_id]);
+    }
   },
 
   // Recurring rule helpers

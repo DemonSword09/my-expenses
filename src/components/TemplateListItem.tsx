@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useTheme from '../hooks/useTheme';
 import type { Template } from '../db/models';
 import { format } from 'date-fns';
+import RecurrenceCalendarModal from './RecurrenceCalendarModal';
 
 type Props = {
   item: Template;
@@ -11,6 +12,7 @@ type Props = {
   onInstantiate?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  categoryLabel?: string;
 };
 
 export default function TemplateListItem({
@@ -19,19 +21,35 @@ export default function TemplateListItem({
   onInstantiate,
   onEdit,
   onDelete,
+  categoryLabel,
 }: Props) {
   const { schemeColors } = useTheme();
   const tpl: any = item;
   const isRec = tpl.is_recurring === 1 || tpl.is_recurring === true;
 
-  // Parse template JSON to get amount
-  let amount = 0;
-  try {
-    const obj = JSON.parse(tpl.template_json);
-    amount = obj.amount || 0;
-  } catch (e) {
-    // ignore
-  }
+  const tryParse = (json: string) => {
+    try { return JSON.parse(json); } catch (e) { return {}; }
+  };
+
+  // Parse template JSON to get details
+  const obj = tryParse(tpl.template_json);
+  const amount = obj.amount || 0;
+  const notes = obj.comment || '';
+  const payeeName = obj.merchant || '';
+  const categoryId = obj.categoryId || null;
+  const type = obj.transaction_type;
+
+  // Determine if income based on parsed type or amount sign
+  // If type is present, use it. Else fall back to amount > 0
+  const isIncome = type ? type === 'INCOME' : amount > 0;
+  
+  // If we want to show absolute amount with color:
+  const displayAmount = Math.abs(amount);
+
+  const [calendarVisible, setCalendarVisible] = React.useState(false);
+  // const [categoryLabel, setCategoryLabel] = React.useState(''); // Removed internal state
+
+  // Removed useEffect for fetching category
 
   return (
     <View style={[styles.container, { backgroundColor: schemeColors.surface }]}>
@@ -46,23 +64,27 @@ export default function TemplateListItem({
         
         <View style={styles.info}>
           <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: schemeColors.text }]}>{tpl.name}</Text>
-            <Text style={[styles.amount, { color: schemeColors.text }]}>
-              {amount > 0 ? `₹${amount}` : ''}
+            <Text style={[styles.title, { color: schemeColors.text }]}>
+              {tpl.name} {isRec && tpl.human_readable ? `(${tpl.human_readable})` : ''}
+            </Text>
+            <Text style={[styles.amount, { color: isIncome ? schemeColors.success : schemeColors.danger }]}>
+              {amount !== 0 ? `${isIncome ? '+' : '-'}₹${displayAmount}` : ''}
             </Text>
           </View>
           
-          {tpl.description ? (
-            <Text style={[styles.description, { color: schemeColors.muted }]} numberOfLines={1}>
-              {tpl.description}
-            </Text>
-          ) : null}
-          
-          <Text style={[styles.meta, { color: schemeColors.muted }]}>
-            {isRec
-              ? `Next: ${tpl.next_date ? format(new Date(tpl.next_date), 'MMM d') : '—'}`
-              : 'One-time template'}
+          <Text style={[styles.details, { color: schemeColors.muted }]} numberOfLines={1}>
+            {[
+              categoryLabel,
+              notes,
+              payeeName
+            ].filter(Boolean).join(' / ')}
           </Text>
+          
+          {isRec && (
+            <Text style={[styles.meta, { color: schemeColors.muted }]}>
+              Next: {tpl.next_date ? format(new Date(tpl.next_date), 'MMM d') : '—'}
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
 
@@ -73,11 +95,29 @@ export default function TemplateListItem({
         
         <View style={[styles.divider, { backgroundColor: schemeColors.border }]} />
         
-        <TouchableOpacity onPress={onInstantiate} style={[styles.actionButton, { flex: 2 }]}>
-          <Text style={[styles.actionText, { color: schemeColors.primary }]}>Use Template</Text>
-          <MaterialCommunityIcons name="arrow-right" size={16} color={schemeColors.primary} style={{ marginLeft: 4 }} />
-        </TouchableOpacity>
+        {isRec ? (
+          <TouchableOpacity onPress={() => setCalendarVisible(true)} style={[styles.actionButton, { flex: 2 }]}>
+            <Text style={[styles.actionText, { color: schemeColors.primary }]}>Recurrences</Text>
+            <MaterialCommunityIcons name="calendar-month" size={16} color={schemeColors.primary} style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={onInstantiate} style={[styles.actionButton, { flex: 2 }]}>
+            <Text style={[styles.actionText, { color: schemeColors.primary }]}>Use Template</Text>
+            <MaterialCommunityIcons name="arrow-right" size={16} color={schemeColors.primary} style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+        )}
       </View>
+
+      {calendarVisible && (
+        <RecurrenceCalendarModal
+          visible={calendarVisible}
+          onClose={() => setCalendarVisible(false)}
+          template={item}
+          onUpdate={() => {
+             // Optional: refresh list if needed, but maybe not strictly required if we only care about transactions list
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -133,6 +173,10 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  details: {
+    fontSize: 14,
+    marginBottom: 4,
   },
   actions: {
     flexDirection: 'row',

@@ -51,5 +51,30 @@ export const expenseListStyles = (scheme: any) => {
     catFallbackText: { fontWeight: '700', color: schemeColors.text },
 
     deletedLine: g.deletedLine,
+
+    // CSV Menu Modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-start', // Align to top
+      alignItems: 'flex-end', // Align to right
+    },
+    menuContainer: {
+      width: 180,
+      marginTop: 40, // Approximate offset for Status Bar + Appbar padding
+      marginRight: 8,
+      borderRadius: 8,
+      elevation: 5,
+      paddingVertical: 8,
+      backgroundColor: schemeColors.surface,
+    },
+    menuItem: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    menuText: {
+      fontSize: 16,
+      color: schemeColors.text,
+    },
   });
 };

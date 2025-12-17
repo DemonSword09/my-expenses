@@ -39,6 +39,8 @@ const AddExpenseForm = () => {
     handleSave,
     payees,
     onMerchantSelect,
+    transactionType,
+    setTransactionType,
   } = useAddExpense(editId);
 
   const onSave = async () => {
@@ -102,6 +104,8 @@ const AddExpenseForm = () => {
               variant="list"
               payees={payees}
               onMerchantSelect={onMerchantSelect}
+              transactionType={transactionType}
+              setTransactionType={setTransactionType}
             />
           </View>
 

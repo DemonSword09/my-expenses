@@ -6,7 +6,9 @@ import useTheme from '../hooks/useTheme';
 import useTemplates from '../hooks/useTemplates';
 import TemplateListItem from '../components/TemplateListItem';
 import TemplateEditor from '../components/TemplateEditor';
+import RecurringScheduleModal from '../components/RecurringScheduleModal';
 import { parseCronToPreset } from '../utils/cronPresets';
+import { CategoryRepo } from '../db/repositories/CategoryRepo';
 
 export default function TemplatesScreen({ navigation }: any) {
   const { globalStyle, schemeColors } = useTheme();
@@ -21,11 +23,35 @@ export default function TemplatesScreen({ navigation }: any) {
   } = useTemplates();
 
   const [editorVisible, setEditorVisible] = useState(false);
+  const [scheduleVisible, setScheduleVisible] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+
+  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
 
   useFocusEffect(
     useCallback(() => {
       load();
+      // Pre-fetch categories to avoid N+1 queries in list items
+      (async () => {
+         try {
+           const cats = await CategoryRepo.listAll();
+           const map: Record<string, string> = {};
+           // First pass: ID -> Label
+           cats.forEach(c => { map[c.id] = c.label; });
+           // Second pass: Handle hierarchy (Parent > Child)
+           const fullMap: Record<string, string> = {};
+           cats.forEach(c => {
+             if (c.parentId && map[c.parentId]) {
+               fullMap[c.id] = `${map[c.parentId]} > ${c.label}`;
+             } else {
+               fullMap[c.id] = c.label;
+             }
+           });
+           setCategoryMap(fullMap);
+         } catch (e) {
+           console.error('Failed to load categories', e);
+         }
+      })();
     }, [load])
   );
 
@@ -55,7 +81,6 @@ export default function TemplatesScreen({ navigation }: any) {
     const initial = {
       id: tpl.id,
       name: tpl.name,
-      description: tpl.description,
       template: initialTemplate,
       is_recurring: tpl.is_recurring === 1,
       preset,
@@ -105,7 +130,6 @@ export default function TemplatesScreen({ navigation }: any) {
       try {
         await createTemplate({
           name: payload.name,
-          description: payload.description,
           template: payload.template,
           is_recurring: payload.is_recurring ?? false,
           recurring_rule: payload.recurring_rule ?? null,
@@ -119,7 +143,6 @@ export default function TemplatesScreen({ navigation }: any) {
       try {
         await updateTemplate(payload.id, {
           name: payload.name,
-          description: payload.description,
           template_json: JSON.stringify(payload.template),
           is_recurring: payload.is_recurring ? 1 : 0,
           recurring_rule_patch: payload.recurring_rule
@@ -145,6 +168,8 @@ export default function TemplatesScreen({ navigation }: any) {
       <Appbar.Header style={{ backgroundColor: schemeColors.background, elevation: 0 }}>
         <Appbar.BackAction onPress={() => navigation.goBack()} color={schemeColors.text} />
         <Appbar.Content title="Templates" titleStyle={{ fontWeight: '700', color: schemeColors.text }} />
+        <Appbar.Action icon="calendar-clock" onPress={() => setScheduleVisible(true)} color={schemeColors.text} />
+        <Appbar.Action icon="bug" onPress={() => navigation.navigate('Debug')} color={schemeColors.text} />
         <Appbar.Action icon="plus" onPress={onAdd} color={schemeColors.primary} />
       </Appbar.Header>
 
@@ -157,6 +182,13 @@ export default function TemplatesScreen({ navigation }: any) {
             onInstantiate={() => onInstantiate(item)}
             onEdit={() => onEdit(item)}
             onDelete={() => onDelete(item)}
+            categoryLabel={(() => {
+                // Extract categoryId from template_json
+                try {
+                    const obj = JSON.parse(item.template_json);
+                    return obj.categoryId ? categoryMap[obj.categoryId] : undefined;
+                } catch { return undefined; }
+            })()}
           />
         )}
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}
@@ -175,6 +207,11 @@ export default function TemplatesScreen({ navigation }: any) {
         onRequestClose={() => setEditorVisible(false)}
         onSave={onSave}
         initial={editing}
+      />
+      
+      <RecurringScheduleModal 
+        visible={scheduleVisible} 
+        onClose={() => setScheduleVisible(false)} 
       />
     </View>
   );

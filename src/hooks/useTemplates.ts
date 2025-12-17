@@ -1,8 +1,8 @@
-// src/hooks/useTemplates.ts
 import { useCallback, useEffect, useState } from 'react';
 import { TemplateRepo } from '../db/repositories/TemplateRepo';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
 import type { Template, RecurringRule } from '../db/models';
+import parser, { CronExpressionParser } from 'cron-parser';
 
 export default function useTemplates() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -28,7 +28,6 @@ export default function useTemplates() {
   const createTemplate = useCallback(
     async (payload: {
       name: string;
-      description?: string | null;
       template: Record<string, any>;
       is_recurring?: boolean;
       recurring_rule?: {
@@ -55,7 +54,6 @@ export default function useTemplates() {
 
       const id = await TemplateRepo.createTemplate({
         name: payload.name,
-        description: payload.description ?? null,
         template: payload.template,
         is_recurring: payload.is_recurring ?? false,
         recurring_rule_id: recurringRuleId,
@@ -83,7 +81,6 @@ export default function useTemplates() {
       // update template row
       const updatePatch: any = {};
       if (patch.name !== undefined) updatePatch.name = patch.name;
-      if (patch.description !== undefined) updatePatch.description = patch.description;
       if (patch.template_json !== undefined) updatePatch.template_json = patch.template_json;
       if (patch.is_recurring !== undefined) updatePatch.is_recurring = patch.is_recurring;
       if ((patch as any).recurring_rule_id !== undefined)
@@ -131,6 +128,103 @@ export default function useTemplates() {
     // do not reload templates list (templates remain unchanged)
   }, []);
 
+  const getRecurringSchedule = useCallback(async (start: Date, end: Date) => {
+    // 1. fetch all templates
+    const allTemplates = await TemplateRepo.listTemplates();
+    
+    // 2. Filter for recurring
+    const recurring = allTemplates.filter(t => t.is_recurring && t.cron_expression);
+
+    const schedule: Array<{
+      date: Date;
+      templateName: string;
+      amount: number;
+      status: 'executed' | 'missed' | 'pending';
+      templateId: string;
+      transactionId?: string;
+      recurringRuleId?: string;
+      templateJson?: string;
+    }> = [];
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // optimization: fetch all executed transactions for these rules? 
+    // Or for each rule, fetch executed. Since number of rules is likely small, sequential or parallel fetch is fine.
+    
+    for (const t of recurring) {
+      if (!t.recurring_rule_id) continue;
+      
+      try {
+        // Fetch executed txns for this rule
+        const executed = await TransactionRepo.findByRecurringRule(t.recurring_rule_id);
+        
+        const options = {
+          currentDate: start,
+          endDate: end,
+          iterator: true,
+          tz: t.timezone || 'UTC'
+        };
+        const interval = CronExpressionParser.parse(t.cron_expression!, options);
+
+        while (true) {
+          try {
+            const obj = interval.next();
+            const date = obj.toDate();
+            
+            // Check if executed on this date (simple day match)
+            const executedTxn = executed.find(txn => {
+                const txnDate = new Date(txn.createdAt);
+                return txnDate.getFullYear() === date.getFullYear() &&
+                       txnDate.getMonth() === date.getMonth() && 
+                       txnDate.getDate() === date.getDate();
+            });
+
+            let status: 'executed' | 'missed' | 'pending' = 'pending';
+            let transactionId: string | undefined = undefined;
+
+            if (executedTxn) {
+                status = 'executed';
+                transactionId = executedTxn.id;
+            } else {
+                if (date < todayStart) {
+                    status = 'missed';
+                } else {
+                    status = 'pending';
+                }
+            }
+
+            // Extract amount from template_json
+            let amount = 0;
+            try {
+              const access = JSON.parse(t.template_json);
+              amount = access.amount || 0;
+            } catch {}
+
+            schedule.push({
+              date,
+              templateName: t.name,
+              amount,
+              status,
+              templateId: t.id,
+              transactionId,
+              recurringRuleId: t.recurring_rule_id,
+              templateJson: t.template_json,
+            });
+          } catch (e) {
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn('Error processing template schedule', t.name, err);
+      }
+    }
+
+    // Sort by date
+    schedule.sort((a, b) => a.date.getTime() - b.date.getTime());
+    return schedule;
+  }, []);
+
   return {
     templates,
     loading,
@@ -139,5 +233,6 @@ export default function useTemplates() {
     updateTemplate,
     deleteTemplate,
     instantiateTemplate,
+    getRecurringSchedule,
   } as const;
 }

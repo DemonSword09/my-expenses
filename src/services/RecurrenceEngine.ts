@@ -32,19 +32,37 @@ export async function generateDueFromRecurringRules(opts?: {
     if (generatedCount >= globalCap) break;
 
     // parse template payload
-    const templateObj = JSON.parse(rule.template_json);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const templateObj: any = JSON.parse(rule.template_json);
 
-    // compute due dates from rule.next_date up to (now) but limited by capPerRule and end_date
+    // Resolve merchant to payeeId if present
+    if (templateObj.merchant && !templateObj.payeeId) {
+      try {
+        const payee = await TransactionRepo.addPayee({ name: templateObj.merchant });
+        templateObj.payeeId = payee.id;
+      } catch (err) {
+        console.warn('recurrence: failed to resolve payee for rule', rule.id, err);
+      }
+    }
+
+    // Determine the effective start date for calculating due dates.
+    // We prefer the date following the LAST generated transaction to fill any gaps.
+    // If no transactions exist, we fall back to rule.created_at.
+    // We do NOT rely solely on rule.next_date because it might be out of sync.
+    const lastTxn = await TransactionRepo.findLastByRecurringRule(rule.id);
+    const effectiveStartAt = lastTxn?.createdAt ? lastTxn.createdAt + 1000 : rule.created_at;
+
+    // compute due dates from effectiveStartAt up to (now) but limited by capPerRule and end_date
     const nextDates = getNextDatesFromCron({
       cron: rule.cron_expression,
       tz: rule.timezone ?? 'UTC',
-      startAt: rule.next_date,
+      startAt: effectiveStartAt,
       stopAt: Math.min(now, rule.end_date ?? now),
       maxCount: Math.min(capPerRule, globalCap - generatedCount),
     });
 
     if (nextDates.length === 0) {
-      // nothing to create; try to compute a future next date (one occurrence after now)
+      // nothing to create; update rule.next_date if it's behind
       try {
         const future = getNextDatesFromCron({
           cron: rule.cron_expression,
@@ -52,7 +70,15 @@ export async function generateDueFromRecurringRules(opts?: {
           startAt: now + 1000,
           maxCount: 1,
         });
-        if (future.length > 0) {
+        if (future.length > 0 && future[0] > rule.next_date) {
+             // Only update if the calculated future is actually ahead.
+             // But wait, if we are in this block, it means no transactions were generated up to NOW.
+             // It implies we are up to date or the rule is for the future.
+             // We can safely fast-forward next_date to the upcoming future date.
+             // However, to keep it consistent with our "last transaction" logic, 
+             // we should probably just leave next_date as a "hint" or update it.
+             // For now, let's update it to the immediate future relative to now, 
+             // so the UI shows something reasonable.
           await TemplateRepo.updateRecurringRuleNextDate(rule.id, future[0]);
         }
       } catch (err) {

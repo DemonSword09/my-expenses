@@ -48,12 +48,13 @@ export const TransactionRepo = {
       createdAt: partial.createdAt ?? nowMs,
       updatedAt: partial.updatedAt ?? nowMs,
       deleted: 0,
+      recurring_rule_id: partial.recurring_rule_id ?? null,
     };
 
     await run(
       `INSERT INTO transactions
-      (id, amount, comment, accountId, payeeId, categoryId, status, cr_amount, transaction_type, createdAt, updatedAt, deleted)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (id, amount, comment, accountId, payeeId, categoryId, status, cr_amount, transaction_type, createdAt, updatedAt, deleted, recurring_rule_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         t.id,
         t.amount,
@@ -67,6 +68,7 @@ export const TransactionRepo = {
         t.createdAt,
         t.updatedAt,
         t.deleted,
+        t.recurring_rule_id ?? null,
       ],
     );
     // const a = first('select * from transactions where id = ?', [t.id]);
@@ -222,5 +224,69 @@ export const TransactionRepo = {
       updatedAt: r.updatedAt ?? null,
       deleted: r.deleted ?? 0,
     } as Transaction;
+  },
+
+
+  async findByRecurringRule(ruleId: string): Promise<Transaction[]> {
+    const rows = await all<any>(
+      'SELECT * FROM transactions WHERE recurring_rule_id = ? AND deleted = 0 ORDER BY createdAt ASC',
+      [ruleId]
+    );
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+      recurring_rule_id: r.recurring_rule_id,
+    })) as Transaction[];
+  },
+
+  async findLastByRecurringRule(ruleId: string): Promise<Transaction | null> {
+    const r = await first<any>(
+      'SELECT * FROM transactions WHERE recurring_rule_id = ? AND deleted = 0 ORDER BY createdAt DESC LIMIT 1',
+      [ruleId]
+    );
+    if (!r) return null;
+    return {
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+      recurring_rule_id: r.recurring_rule_id,
+    } as Transaction;
+  },
+
+  async updateCategoryForMultiple(ids: string[], categoryId: string): Promise<void> {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    await run(
+      `UPDATE transactions SET categoryId = ?, updatedAt = ? WHERE id IN (${placeholders})`,
+      [categoryId, Date.now(), ...ids]
+    );
+  },
+
+  async updatePayeeForMultiple(ids: string[], payeeId: string): Promise<void> {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    await run(
+      `UPDATE transactions SET payeeId = ?, updatedAt = ? WHERE id IN (${placeholders})`,
+      [payeeId, Date.now(), ...ids]
+    );
   },
 };

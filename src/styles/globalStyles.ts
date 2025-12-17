@@ -247,7 +247,7 @@ export const globalStyles = (scheme: any) => {
       borderTopLeftRadius: RADIUS.md,
       borderTopRightRadius: RADIUS.md,
     },
-    modalRow: { paddingVertical: 12 },
+    modalRow: { paddingVertical: 12 , flexDirection: 'row' },
     modalRowText: { fontSize: 16, color: schemeColors.text, paddingLeft: 8 },
   });
 };

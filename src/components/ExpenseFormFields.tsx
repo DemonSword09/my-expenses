@@ -18,6 +18,8 @@ type Props = {
   openCategoryPicker: () => void;
   payees?: Payee[];
   onMerchantSelect?: (p: Payee) => void;
+  transactionType?: 'EXPENSE' | 'INCOME';
+  setTransactionType?: (t: 'EXPENSE' | 'INCOME') => void;
 };
 
 export default function ExpenseFormFields({
@@ -34,6 +36,8 @@ export default function ExpenseFormFields({
   variant = 'default',
   payees = [],
   onMerchantSelect,
+  transactionType = 'EXPENSE',
+  setTransactionType,
 }: Props & { variant?: 'default' | 'list' }) {
   const { scheme, schemeColors, globalStyle } = useTheme();
   const s = require('../styles/addExpenseStyles').addExpenseStyles(scheme);
@@ -97,6 +101,41 @@ export default function ExpenseFormFields({
   if (variant === 'list') {
     return (
       <>
+        {setTransactionType && (
+          <View style={[globalStyle.row, { justifyContent: 'center', paddingVertical: 12 }]}>
+            <View style={{ flexDirection: 'row', backgroundColor: schemeColors.background, borderRadius: 8, padding: 2 }}>
+              <TouchableOpacity
+                onPress={() => setTransactionType('EXPENSE')}
+                style={{
+                  paddingHorizontal: 24,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: transactionType === 'EXPENSE' ? schemeColors.danger : 'transparent',
+                }}
+              >
+                <Text style={{ 
+                  color: transactionType === 'EXPENSE' ? '#fff' : schemeColors.text,
+                  fontWeight: '600'
+                }}>Expense</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setTransactionType('INCOME')}
+                style={{
+                  paddingHorizontal: 24,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  backgroundColor: transactionType === 'INCOME' ? schemeColors.success : 'transparent',
+                }}
+              >
+                <Text style={{ 
+                  color: transactionType === 'INCOME' ? '#fff' : schemeColors.text,
+                  fontWeight: '600'
+                }}>Income</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={globalStyle.row}>
           <Text style={globalStyle.rowLabel}>Amount</Text>
           <TextInput
@@ -168,6 +207,48 @@ export default function ExpenseFormFields({
 
   return (
     <>
+      {setTransactionType && (
+        <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={() => setTransactionType('EXPENSE')}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: 'center',
+              backgroundColor: transactionType === 'EXPENSE' ? schemeColors.danger : schemeColors.surface,
+              borderTopLeftRadius: 8,
+              borderBottomLeftRadius: 8,
+              borderWidth: 1,
+              borderColor: transactionType === 'EXPENSE' ? schemeColors.danger : schemeColors.border,
+            }}
+          >
+            <Text style={{ 
+              color: transactionType === 'EXPENSE' ? '#fff' : schemeColors.text,
+              fontWeight: '600'
+            }}>Expense</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTransactionType('INCOME')}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: 'center',
+              backgroundColor: transactionType === 'INCOME' ? schemeColors.success : schemeColors.surface,
+              borderTopRightRadius: 8,
+              borderBottomRightRadius: 8,
+              borderWidth: 1,
+              borderColor: transactionType === 'INCOME' ? schemeColors.success : schemeColors.border,
+              borderLeftWidth: 0,
+            }}
+          >
+            <Text style={{ 
+              color: transactionType === 'INCOME' ? '#fff' : schemeColors.text,
+              fontWeight: '600'
+            }}>Income</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <Text style={s.label}>Amount</Text>
       <TextInput
         keyboardType="numeric"

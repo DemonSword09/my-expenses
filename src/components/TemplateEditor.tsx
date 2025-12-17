@@ -28,7 +28,6 @@ type Props = {
   onSave: (payload: {
     id?: string;
     name: string;
-    description?: string | null;
     template: Record<string, any>;
     is_recurring?: boolean;
     recurring_rule?: {
@@ -46,7 +45,6 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
   const isDark = scheme === 'dark';
 
   const [name, setName] = useState(initial?.name ?? '');
-  const [description, setDescription] = useState(initial?.description ?? '');
 
   const {
     merchant,
@@ -69,6 +67,9 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
     onDateChange,
     payees,
     onMerchantSelect,
+    reset,
+    transactionType,
+    setTransactionType,
   } = useAddExpense(undefined, initial?.template);
 
   const [isRecurring, setIsRecurring] = useState<boolean>(!!initial?.is_recurring);
@@ -82,17 +83,27 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
 
   useEffect(() => {
     if (visible) {
-      setName(initial?.name ?? '');
-      setDescription(initial?.description ?? '');
-      setIsRecurring(!!initial?.is_recurring);
-      
-      // If editing existing recurring rule, try to reverse engineer preset?
-      // For now, just default to what was passed or defaults
-      setPreset(initial?.preset ?? 'monthly');
-      setTimeOfDay(initial?.timeOfDay ?? '09:00');
-      setWeekday(initial?.weekday ?? 1);
-      setDayOfMonth(initial?.dayOfMonth ?? 1);
-      setTz(initial?.tz ?? 'UTC');
+      if (initial) {
+        setName(initial.name ?? '');
+        setIsRecurring(!!initial.is_recurring);
+        setPreset(initial.preset ?? 'monthly');
+        setTimeOfDay(initial.timeOfDay ?? '09:00');
+        setWeekday(initial.weekday ?? 1);
+        setDayOfMonth(initial.dayOfMonth ?? 1);
+        setTz(initial.tz ?? 'UTC');
+      } else {
+        // Reset local state
+        setName('');
+        setIsRecurring(false);
+        setPreset('monthly');
+        setTimeOfDay('09:00');
+        setWeekday(1);
+        setDayOfMonth(1);
+        setTz('UTC');
+        
+        // Reset hook state
+        reset();
+      }
     }
   }, [visible, initial]);
 
@@ -101,12 +112,27 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
       Alert.alert('Validation', 'Please give the template a name.');
       return;
     }
+    // Apply sign based on type
+    const parsedAmount = Number(amount);
+    const finalAmount = transactionType === 'EXPENSE' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
+
     const tpl = {
-      amount: Number(amount),
+      amount: finalAmount,
       merchant,
+      payeeId: initial?.template?.payeeId, // Preserve existing payeeId if any, or it will be resolved on save?
+      // Wait, useAddExpense resolves payeeId internally on save, but here we are building a template.
+      // We need to resolve payeeId here or store the name and resolve later?
+      // The current logic stores 'merchant' name. 
+      // RecurrenceEngine resolves it.
+      // But RecurrenceCalendarModal uses TransactionRepo.create which expects payeeId.
+      // Let's store payeeId if we have it.
+      // Actually, useAddExpense doesn't expose payeeId directly unless we look at 'payees'.
+      // Let's try to resolve it or just rely on 'merchant' string and let the consumer handle it?
+      // TransactionRepo.create doesn't resolve merchant name to payeeId automatically.
+      // We need to resolve it here.
       comment: notes,
       categoryId: selectedCategory?.id,
-      transaction_type: 'EXPENSE',
+      transaction_type: transactionType,
     };
 
     // ensure numeric amount
@@ -115,7 +141,6 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
     const payload: any = {
       id: initial?.id,
       name: name.trim(),
-      description: description ? description.trim() : null,
       template: tpl,
       is_recurring: isRecurring,
       recurring_rule: null,
@@ -173,22 +198,12 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
             
             {/* Template Info Section */}
             <View style={globalStyle.formSection}>
-              <View style={globalStyle.row}>
+              <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
                 <Text style={globalStyle.rowLabel}>Name</Text>
                 <TextInput
                   value={name}
                   onChangeText={setName}
                   placeholder="e.g. Monthly Rent"
-                  placeholderTextColor={schemeColors.muted}
-                  style={globalStyle.rowInput}
-                />
-              </View>
-              <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
-                <Text style={globalStyle.rowLabel}>Description</Text>
-                <TextInput
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholder="Optional"
                   placeholderTextColor={schemeColors.muted}
                   style={globalStyle.rowInput}
                 />
@@ -211,6 +226,8 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
                 variant="list"
                 payees={payees}
                 onMerchantSelect={onMerchantSelect}
+                transactionType={transactionType}
+                setTransactionType={setTransactionType}
               />
             </View>
 

@@ -66,9 +66,22 @@ export async function runMigrations(): Promise<void> {
         }
       }
     }
-
     await markApplied(seedName);
-    console.log('[migrations] applied', seedName);
+
+    // 003 add recurring_rule_id
+    // FORCE RUN to ensure column exists
+    try {
+      await run(`ALTER TABLE transactions ADD COLUMN recurring_rule_id TEXT;`);
+    } catch (e: any) {
+      // ignore if exists
+    }
+    
+    // Mark as applied if not already
+    const mig3 = '003_add_recurring_rule_id';
+    if (!(await isApplied(mig3))) {
+      await markApplied(mig3);
+    }
+
   } catch (err) {
     console.error('[migrations] failed', err);
     throw err;
