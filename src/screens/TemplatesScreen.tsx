@@ -33,24 +33,24 @@ export default function TemplatesScreen({ navigation }: any) {
       load();
       // Pre-fetch categories to avoid N+1 queries in list items
       (async () => {
-         try {
-           const cats = await CategoryRepo.listAll();
-           const map: Record<string, string> = {};
-           // First pass: ID -> Label
-           cats.forEach(c => { map[c.id] = c.label; });
-           // Second pass: Handle hierarchy (Parent > Child)
-           const fullMap: Record<string, string> = {};
-           cats.forEach(c => {
-             if (c.parentId && map[c.parentId]) {
-               fullMap[c.id] = `${map[c.parentId]} > ${c.label}`;
-             } else {
-               fullMap[c.id] = c.label;
-             }
-           });
-           setCategoryMap(fullMap);
-         } catch (e) {
-           console.error('Failed to load categories', e);
-         }
+        try {
+          const cats = await CategoryRepo.listAll();
+          const map: Record<string, string> = {};
+          // First pass: ID -> Label
+          cats.forEach(c => { map[c.id] = c.label; });
+          // Second pass: Handle hierarchy (Parent > Child)
+          const fullMap: Record<string, string> = {};
+          cats.forEach(c => {
+            if (c.parentId && map[c.parentId]) {
+              fullMap[c.id] = `${map[c.parentId]} > ${c.label}`;
+            } else {
+              fullMap[c.id] = c.label;
+            }
+          });
+          setCategoryMap(fullMap);
+        } catch (e) {
+          console.error('Failed to load categories', e);
+        }
       })();
     }, [load])
   );
@@ -63,13 +63,13 @@ export default function TemplatesScreen({ navigation }: any) {
   const onEdit = (tpl: any) => {
     // build the initial object for editor (convert template_json -> object; populate recurrence if present)
     const initialTemplate = tpl.template_json ? JSON.parse(tpl.template_json) : {};
-    
+
     // Parse cron expression to get preset values
     let preset = 'monthly';
     let timeOfDay = '09:00';
     let weekday = 1;
     let dayOfMonth = 1;
-    
+
     if (tpl.cron_expression) {
       const parsed = parseCronToPreset(tpl.cron_expression);
       preset = parsed.preset;
@@ -77,7 +77,7 @@ export default function TemplatesScreen({ navigation }: any) {
       weekday = parsed.weekday ?? 1;
       dayOfMonth = parsed.dayOfMonth ?? 1;
     }
-    
+
     const initial = {
       id: tpl.id,
       name: tpl.name,
@@ -90,10 +90,10 @@ export default function TemplatesScreen({ navigation }: any) {
       tz: tpl.timezone ?? 'UTC',
       recurring_rule: tpl.recurring_rule_id
         ? {
-            cronExpression: tpl.cron_expression,
-            timezone: tpl.timezone,
-            nextDate: tpl.next_date,
-          }
+          cronExpression: tpl.cron_expression,
+          timezone: tpl.timezone,
+          nextDate: tpl.next_date,
+        }
         : null,
     };
     setEditing(initial);
@@ -147,10 +147,10 @@ export default function TemplatesScreen({ navigation }: any) {
           is_recurring: payload.is_recurring ? 1 : 0,
           recurring_rule_patch: payload.recurring_rule
             ? {
-                cron_expression: payload.recurring_rule.cronExpression,
-                timezone: payload.recurring_rule.timezone,
-                next_date: payload.recurring_rule.nextDate,
-              }
+              cron_expression: payload.recurring_rule.cronExpression,
+              timezone: payload.recurring_rule.timezone,
+              next_date: payload.recurring_rule.nextDate,
+            }
             : undefined,
         } as any);
       } catch (err) {
@@ -163,6 +163,31 @@ export default function TemplatesScreen({ navigation }: any) {
     await load();
   };
 
+  // Optimize: Pre-calculate derived state (parsed JSON + Category Label)
+  // This avoids parsing JSON in the render loop.
+  const viewData = React.useMemo(() => {
+    return templates.map((t: any) => {
+      let catLabel: string | undefined;
+      try {
+        const obj = JSON.parse(t.template_json);
+        if (obj.categoryId) catLabel = categoryMap[obj.categoryId];
+      } catch {
+        // ignore
+      }
+      return { ...t, _catLabel: catLabel };
+    });
+  }, [templates, categoryMap]);
+
+  const renderItem = useCallback(({ item }: { item: any }) => (
+    <TemplateListItem
+      item={item}
+      onInstantiate={() => onInstantiate(item)}
+      onEdit={() => onEdit(item)}
+      onDelete={() => onDelete(item)}
+      categoryLabel={item._catLabel}
+    />
+  ), [onInstantiate, onEdit, onDelete]);
+
   return (
     <View style={[styles.container, { backgroundColor: schemeColors.background }]}>
       <Appbar.Header style={{ backgroundColor: schemeColors.background, elevation: 0 }}>
@@ -174,23 +199,9 @@ export default function TemplatesScreen({ navigation }: any) {
       </Appbar.Header>
 
       <FlatList
-        data={templates}
+        data={viewData}
         keyExtractor={(t) => t.id}
-        renderItem={({ item }) => (
-          <TemplateListItem
-            item={item}
-            onInstantiate={() => onInstantiate(item)}
-            onEdit={() => onEdit(item)}
-            onDelete={() => onDelete(item)}
-            categoryLabel={(() => {
-                // Extract categoryId from template_json
-                try {
-                    const obj = JSON.parse(item.template_json);
-                    return obj.categoryId ? categoryMap[obj.categoryId] : undefined;
-                } catch { return undefined; }
-            })()}
-          />
-        )}
+        renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
@@ -208,10 +219,10 @@ export default function TemplatesScreen({ navigation }: any) {
         onSave={onSave}
         initial={editing}
       />
-      
-      <RecurringScheduleModal 
-        visible={scheduleVisible} 
-        onClose={() => setScheduleVisible(false)} 
+
+      <RecurringScheduleModal
+        visible={scheduleVisible}
+        onClose={() => setScheduleVisible(false)}
       />
     </View>
   );

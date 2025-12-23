@@ -34,7 +34,7 @@ type UseAddExpenseReturn = {
 
   loading: boolean;
 
-  handleSave: () => Promise<void>;
+  handleSave: () => Promise<boolean>;
   payees: Payee[];
   onMerchantSelect: (p: Payee) => void;
   reset: () => void;
@@ -73,7 +73,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     try {
       const t = await TransactionRepo.findById(id);
       if (!t) return;
-      
+
       // Determine type and absolute amount
       // If transaction_type is set, use it.
       // If not, infer from amount sign?
@@ -84,7 +84,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       // BUT, if we are changing the storage convention, we should be careful.
       // The user said "if expense entered amount is negative".
       // This implies we should store negative for expense.
-      
+
       let type: 'EXPENSE' | 'INCOME' = 'EXPENSE';
       if (t.transaction_type === 'INCOME') type = 'INCOME';
       else if (t.amount > 0 && t.transaction_type !== 'EXPENSE') {
@@ -93,7 +93,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         // Let's rely on `transaction_type` if present.
         // If not present, default to EXPENSE.
       }
-      
+
       // If we are enforcing negative for expense, we should display absolute value.
       setTransactionType(type);
       setAmount(String(Math.abs(t.amount)));
@@ -135,57 +135,57 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       // The user said "template json form".
       // Let's assume the template object structure matches what we need or we map it.
       // In TemplateEditor, initial.template is passed.
-      
+
       // If initialData has categoryId, we might need to load it?
       // But we can just set selectedCategory if we have the full object, or load it if we only have ID.
       // TemplateEditor passes `template` which might have `categoryId`.
       if (initialData.categoryId) {
-         // we need to load the category object to set selectedCategory
-         (async () => {
-            const cat = await CategoryRepo.findById(initialData.categoryId);
-            if (cat) setSelectedCategory(cat);
-         })();
+        // we need to load the category object to set selectedCategory
+        (async () => {
+          const cat = await CategoryRepo.findById(initialData.categoryId);
+          if (cat) setSelectedCategory(cat);
+        })();
       }
-      
+
       // For merchant, if it's just a string in template, use it.
       // If it's a payeeId, we might need to load it.
       // But templates usually store the raw values for simplicity?
       // Let's assume 'merchant' property exists or we check 'payee_name' etc.
       if (initialData.merchant) setMerchant(initialData.merchant);
-      
+
       // Initialize transaction type
       if (initialData.transaction_type) {
         setTransactionType(initialData.transaction_type === 'INCOME' ? 'INCOME' : 'EXPENSE');
       } else if (initialData.amount && Number(initialData.amount) > 0) {
-         // If positive amount and no type specified, might be income? 
-         // But existing logic stores expenses as positive too? 
-         // Wait, the plan said "Expense: Amount is stored as negative".
-         // But currently `useAddExpense` stores `amount: parsed`.
-         // Let's check `handleSave` again.
-         // `handleSave` currently does `amount: parsed`.
-         // If I change `handleSave` to flip sign, then here I should check sign.
-         // If existing data is positive for expense, then I need to be careful.
-         // The user said "if expense entered amount is negative".
-         // Wait, "if expense entered amount is negative" - this might mean the user wants to enter negative?
-         // No, "if expense entered amount is negative" probably means "if expense, make it negative".
-         // "if income possitive".
-         
-         // Let's assume standard behavior:
-         // Expense: User enters 100 -> DB stores -100.
-         // Income: User enters 100 -> DB stores 100.
-         
-         // So if I load a transaction:
-         // If amount < 0 -> Expense (and show positive in input).
-         // If amount > 0 -> Income.
-         
-         const amt = Number(initialData.amount);
-         if (amt < 0) {
-           setTransactionType('EXPENSE');
-           setAmount(String(Math.abs(amt)));
-         } else {
-           setTransactionType('INCOME');
-           setAmount(String(amt));
-         }
+        // If positive amount and no type specified, might be income? 
+        // But existing logic stores expenses as positive too? 
+        // Wait, the plan said "Expense: Amount is stored as negative".
+        // But currently `useAddExpense` stores `amount: parsed`.
+        // Let's check `handleSave` again.
+        // `handleSave` currently does `amount: parsed`.
+        // If I change `handleSave` to flip sign, then here I should check sign.
+        // If existing data is positive for expense, then I need to be careful.
+        // The user said "if expense entered amount is negative".
+        // Wait, "if expense entered amount is negative" - this might mean the user wants to enter negative?
+        // No, "if expense entered amount is negative" probably means "if expense, make it negative".
+        // "if income possitive".
+
+        // Let's assume standard behavior:
+        // Expense: User enters 100 -> DB stores -100.
+        // Income: User enters 100 -> DB stores 100.
+
+        // So if I load a transaction:
+        // If amount < 0 -> Expense (and show positive in input).
+        // If amount > 0 -> Income.
+
+        const amt = Number(initialData.amount);
+        if (amt < 0) {
+          setTransactionType('EXPENSE');
+          setAmount(String(Math.abs(amt)));
+        } else {
+          setTransactionType('INCOME');
+          setAmount(String(amt));
+        }
       }
     } else {
       // reset to defaults if no editId and no initialData (e.g. creating new)
@@ -238,7 +238,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
 
   const onMerchantSelect = useCallback(async (payee: Payee) => {
     setMerchant(payee.name);
-    
+
     // Auto-populate from last transaction for this payee
     if (!editId) {
       try {
@@ -246,10 +246,10 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         if (lastTxn) {
           setAmount(String(lastTxn.amount));
           if (lastTxn.comment) setNotes(lastTxn.comment);
-          
+
           if (lastTxn.categoryId) {
-             const cat = await CategoryRepo.findById(lastTxn.categoryId);
-             if (cat) setSelectedCategory(cat);
+            const cat = await CategoryRepo.findById(lastTxn.categoryId);
+            if (cat) setSelectedCategory(cat);
           }
         }
       } catch (err) {
@@ -277,7 +277,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     setShowPicker(Platform.OS === 'ios');
     if (d) setDateMs(d.getTime());
   }, []);
-  
+
   const [payees, setPayees] = useState<Payee[]>([]);
 
   // load payees for autocomplete
@@ -292,12 +292,21 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     })();
   }, []);
 
+  /* const [errors, setErrors] = useState<{ amount?: string }>({}); */ // Removed
+
   const handleSave = useCallback(async () => {
+    /* setErrors({}); */
     setLoading(true);
     try {
+      if (!amount) {
+        /* setErrors({ amount: 'Amount is required' }); */
+        return false;
+      }
+
       const parsed = parseFloat(String(amount).replace(/,/g, ''));
       if (Number.isNaN(parsed) || parsed <= 0) {
-        throw new Error('Invalid amount');
+        /* setErrors({ amount: 'Invalid amount' }); */
+        return false;
       }
 
       // Apply sign based on type
@@ -334,20 +343,22 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       } else {
         await TransactionRepo.create(payload);
       }
+      return true;
     } catch (err: any) {
       console.error('useAddExpense: save failed', err);
       Alert.alert(err?.message ? err.message : 'Save failed', 'Unable to save transaction.');
-      throw err;
+      return false;
     } finally {
       setLoading(false);
     }
-  }, [amount, notes, selectedCategory, dateMs, editId, merchant]);
+  }, [amount, notes, selectedCategory, dateMs, editId, merchant, transactionType]); // Added transactionType dependency
 
   return {
     merchant,
     setMerchant,
     amount,
     setAmount,
+    // errors,
     notes,
     setNotes,
     transactionType,

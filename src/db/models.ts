@@ -69,6 +69,14 @@ export interface Transaction {
   recurring_rule_id?: string | null;
 }
 
+export interface TransactionDetail extends Transaction {
+  payee_name?: string | null;
+  category_label?: string | null;
+  category_parent_label?: string | null;
+  category_icon?: string | null;
+  category_color?: number | null;
+}
+
 export interface Transfer {
   id: UUID;
   transactionId: UUID;

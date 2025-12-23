@@ -1,16 +1,16 @@
-// src/db/migrations/index.ts
 import { exec, run, first } from '../sqlite';
-import { MIGRATION_001_SQL } from './default_schema';
-
-//import category seed data
+import { SCHEMA_SQL, INDEXES_SQL } from './default_schema';
 import { CATEGORY_SEED } from './categories';
 import { uuidSync } from '@src/utils/uuid';
 
 async function isApplied(name: string): Promise<boolean> {
-  const row = await first<{ name: string }>('SELECT name FROM migrations WHERE name = ? LIMIT 1', [
-    name,
-  ]);
-  return !!row;
+  // If migrations table doesn't exist, nothing is applied
+  try {
+    const row = await first<{ name: string }>('SELECT name FROM migrations WHERE name = ? LIMIT 1', [name]);
+    return !!row;
+  } catch (e) {
+    return false;
+  }
 }
 
 async function markApplied(name: string): Promise<void> {
@@ -18,68 +18,67 @@ async function markApplied(name: string): Promise<void> {
   await run('INSERT INTO migrations (name, applied_at) VALUES (?, ?)', [name, now]);
 }
 
+async function wipeDatabase() {
+  console.log('[migrations] Wiping database for fresh schema...');
+  await exec(`
+    PRAGMA foreign_keys = OFF;
+    DROP TABLE IF EXISTS transactions;
+    DROP TABLE IF EXISTS accounts;
+    DROP TABLE IF EXISTS payees;
+    DROP TABLE IF EXISTS categories;
+    DROP TABLE IF EXISTS transfers;
+    DROP TABLE IF EXISTS templates;
+    DROP TABLE IF EXISTS recurring_rules;
+    DROP TABLE IF EXISTS migrations;
+    PRAGMA foreign_keys = ON;
+  `);
+}
+
 export async function runMigrations(): Promise<void> {
   try {
-    // await exec(`
-    //   DROP TABLE migrations;
-    //   DROP TABLE accounts;
-    //   DROP TABLE payees;
-    //   DROP TABLE categories;
-    //   DROP TABLE transactions;
-    //   DROP TABLE transfers;
-    //   DROP TABLE templates;
-    //   DROP TABLE recurring_rules;
-    //   `);
-    await exec(`CREATE TABLE IF NOT EXISTS migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      applied_at TEXT NOT NULL);`);
-    const name = '001_create_schema';
-    const already = await isApplied(name);
-    if (!already) {
-      await exec(MIGRATION_001_SQL);
-      await markApplied(name);
-      console.log('[migrations] applied', name);
-    }
-
-    // categories seed (idempotent)
-    const seedName = '001_seed_categories';
-    const seeded = await isApplied(seedName);
-    if (seeded) return;
-
-    for (const cat of CATEGORY_SEED) {
-      const parentId = uuidSync();
-      await run(
-        `INSERT OR IGNORE INTO categories (id, label, parentId, icon, color)
-         VALUES (?, ?, NULL, ?, ?)`,
-        [parentId, cat.name, cat.icon ?? null, null],
-      );
-
-      if (Array.isArray(cat.subcategories)) {
-        for (const sub of cat.subcategories) {
-          const subId = uuidSync();
-          await run(
-            `INSERT OR IGNORE INTO categories (id, label, parentId, icon, color)
-             VALUES (?, ?, ?, ?, ?)`,
-            [subId, sub.name, parentId, sub.icon ?? null, null],
-          );
-        }
-      }
-    }
-    await markApplied(seedName);
-
-    // 003 add recurring_rule_id
-    // FORCE RUN to ensure column exists
-    try {
-      await run(`ALTER TABLE transactions ADD COLUMN recurring_rule_id TEXT;`);
-    } catch (e: any) {
-      // ignore if exists
-    }
+    const SCHEMA_MIGRATION = '001_schema_v2'; 
     
-    // Mark as applied if not already
-    const mig3 = '003_add_recurring_rule_id';
-    if (!(await isApplied(mig3))) {
-      await markApplied(mig3);
+    // 1. SCHEMA
+    // If getting 'no such table: migrations' -> isApplied returns false -> we enter the block.
+    // If '001_schema_v2' is missing -> we WIPE and RE-CREATE.
+    if (!(await isApplied(SCHEMA_MIGRATION))) {
+      await wipeDatabase();
+      await exec(SCHEMA_SQL); 
+      // Re-create migration table is part of SCHEMA_SQL usually, but let's be safe:
+      // SCHEMA_SQL likely has 'CREATE TABLE IF NOT EXISTS migrations...' at the top.
+      await markApplied(SCHEMA_MIGRATION);
+      console.log('[migrations] applied', SCHEMA_MIGRATION);
+    }
+
+    // 2. CATEGORIES (Seed Data)
+    const SEED_MIGRATION = '002_categories_v1';
+    if (!(await isApplied(SEED_MIGRATION))) {
+       for (const cat of CATEGORY_SEED) {
+          const parentId = uuidSync();
+          await run(
+            `INSERT OR IGNORE INTO categories (id, label, parentId, icon, color) VALUES (?, ?, NULL, ?, ?)`,
+            [parentId, cat.name, cat.icon ?? null, null],
+          );
+          if (Array.isArray(cat.subcategories)) {
+            for (const sub of cat.subcategories) {
+              const subId = uuidSync();
+              await run(
+                `INSERT OR IGNORE INTO categories (id, label, parentId, icon, color) VALUES (?, ?, ?, ?, ?)`,
+                [subId, sub.name, parentId, sub.icon ?? null, null],
+              );
+            }
+          }
+       }
+       await markApplied(SEED_MIGRATION);
+       console.log('[migrations] applied', SEED_MIGRATION);
+    }
+
+    // 3. INDEXES
+    const INDEX_MIGRATION = '003_indexes_v1';
+    if (!(await isApplied(INDEX_MIGRATION))) {
+      await exec(INDEXES_SQL);
+      await markApplied(INDEX_MIGRATION);
+      console.log('[migrations] applied', INDEX_MIGRATION);
     }
 
   } catch (err) {

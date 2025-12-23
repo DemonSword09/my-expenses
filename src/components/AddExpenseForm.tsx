@@ -1,5 +1,5 @@
 // src/components/AddExpenseForm.tsx
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, StyleSheet } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -14,7 +14,7 @@ const AddExpenseForm = () => {
   const params: any = (route as any).params ?? {};
   const editId: string | undefined = params.id;
 
-  const { schemeColors, globalStyle } = useTheme();
+  const { schemeColors, globalStyle, addExpenseStyle } = useTheme();
 
   const {
     merchant,
@@ -43,19 +43,40 @@ const AddExpenseForm = () => {
     setTransactionType,
   } = useAddExpense(editId);
 
+  const [formErrors, setFormErrors] = React.useState<{ amount?: string }>({});
+
+  // Auto-hide errors after 2 seconds
+  React.useEffect(() => {
+    if (Object.keys(formErrors).length > 0) {
+      const timer = setTimeout(() => {
+        setFormErrors({});
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [formErrors]);
+
   const onSave = async () => {
+    // Validate locally
+    if (!amount) {
+      setFormErrors({ amount: 'Amount is required' });
+      return;
+    }
+    const parsed = parseFloat(String(amount).replace(/,/g, ''));
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      setFormErrors({ amount: 'Invalid amount' });
+      return;
+    }
+
+    setFormErrors({});
+
     try {
-      await handleSave();
-      // handleSave usually handles navigation or alerts, but if we need to force goBack:
-      if (!editId) {
-         // for new expense, maybe we want to go back? 
-         // useAddExpense might not auto-navigate.
-         navigation.goBack();
-      } else {
-         navigation.goBack();
+      // Hook handles the DB save
+      const success = await handleSave();
+      if (success) {
+        navigation.goBack();
       }
-    } catch (err) {
-      // ignore
+    } catch (err: any) {
+      console.error('Save error', err);
     }
   };
 
@@ -106,18 +127,19 @@ const AddExpenseForm = () => {
               onMerchantSelect={onMerchantSelect}
               transactionType={transactionType}
               setTransactionType={setTransactionType}
+              errors={formErrors}
             />
           </View>
 
           <TouchableOpacity
             onPress={onSave}
             disabled={loading}
-            style={[globalStyle.primaryButton, { marginTop: 24 }]}
+            style={[globalStyle.glassBase, addExpenseStyle.glassSaveButton, { marginTop: 24, opacity: loading ? 0.7 : 1 }]}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={globalStyle.primaryButtonText}>Save Transaction</Text>
+              <Text style={addExpenseStyle.glassSaveButtonText}>Save Transaction</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -140,6 +162,7 @@ const AddExpenseForm = () => {
           onChange={onDateChange}
         />
       )}
+
     </View>
   );
 };

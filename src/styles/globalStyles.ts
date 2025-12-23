@@ -132,7 +132,7 @@ export const globalStyles = (scheme: any) => {
       elevation: 4,
       borderWidth: 1,
       borderColor: schemeColors.border,
-      overflow: Platform.OS === 'android' ? 'hidden' : 'visible', 
+      overflow: 'visible',
     },
     formRow: {
       flexDirection: 'row',
@@ -247,7 +247,18 @@ export const globalStyles = (scheme: any) => {
       borderTopLeftRadius: RADIUS.md,
       borderTopRightRadius: RADIUS.md,
     },
-    modalRow: { paddingVertical: 12 , flexDirection: 'row' },
+    modalRow: { paddingVertical: 12, flexDirection: 'row' },
     modalRowText: { fontSize: 16, color: schemeColors.text, paddingLeft: 8 },
+
+    // Glass Base (available globally)
+    glassBase: {
+      borderWidth: 1,
+      borderColor: schemeColors.glassBorder, // Global uses schemeColors directly which calls getThemeColors
+      shadowColor: schemeColors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
   });
 };

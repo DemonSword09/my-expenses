@@ -8,6 +8,12 @@ import { CsvHelper } from '../utils/CsvHelper'
 import { ColumnMapping, Transaction } from '../db/models'
 import CsvPreviewTable from '../components/CsvPreviewTable'
 import useTheme from '../hooks/useTheme'
+import { TransactionRepo } from '@src/db/repositories/TransactionRepo'
+import { exec, first, run, all } from '@src/db/sqlite'
+import { uuidSync } from '../utils/uuid'
+import { CategoryRepo } from '@src/db/repositories/CategoryRepo'
+import WaveLoading from '@src/components/WaveLoading'
+import dayjs from 'dayjs'
 
 export default function ImportCsvScreen() {
   const { schemeColors, globalStyle } = useTheme()
@@ -15,6 +21,9 @@ export default function ImportCsvScreen() {
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<any[]>([])
   const [mappings, setMappings] = useState<ColumnMapping[]>([])
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
 
   const pickCsv = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -28,32 +37,146 @@ export default function ImportCsvScreen() {
 
       const parsed = await CsvHelper.parseCsv(content)
       setHeaders(parsed.headers)
-      setRows(parsed.rows.slice(0, 20)) // preview only
+      setRows(parsed.rows)
 
       const autoMapped = CsvHelper.autoMapColumns(parsed.headers)
       setMappings(autoMapped)
     }
   }
 
-  const onImport = () => {
+  const onImport = async () => {
     // map the rows to updated column mappings
-    const mappedRows = rows.map((row) => {
-      const mappedRow: Record<string, any> = {}
+    const categories = await CategoryRepo.listAll()
+    const payees = await all<any>('SELECT * FROM payees')
 
-      mappings.forEach((mapping) => {
-        if (mapping.appField === 'ignore') return
-        mappedRow[mapping.appField] = row[mapping.csvColumn]
-      })
-      const { category, subcategory } = CsvHelper.splitCategory(mappedRow.category)
-      mappedRow.category = category
-      mappedRow.subcategory = subcategory
-      return mappedRow
-    })
+    // Detect valid date format from the first non-empty date row
+    let dateFormat: string | null = null
+    const dateMapping = mappings.find(m => m.appField === 'date')
+    if (dateMapping) {
+      const sampleRow = rows.find(r => r[dateMapping.csvColumn])
+      if (sampleRow) {
+        dateFormat = CsvHelper.detectDateFormat(sampleRow[dateMapping.csvColumn])
+      }
+    }
 
-    console.log('Mapped Rows:', mappedRows)
-    //validate and save to DB
+    // map the rows to updated column mappings
+    const transactions: Transaction[] = []
 
+    setIsLoading(true)
+    setProgress(0)
 
+    try {
+      await exec('BEGIN TRANSACTION')
+
+      const total = rows.length
+      let processed = 0
+
+      for (const row of rows) {
+        // UI update throttling
+        processed++
+        if (processed % 20 === 0) {
+          setProgress(processed / total)
+          // yield to event loop so animation frame can fire
+          await new Promise(r => setTimeout(r, 0))
+        }
+
+        const mappedRow: Record<string, any> = {}
+
+        mappings.forEach((mapping) => {
+          if (mapping.appField === 'ignore') return
+          mappedRow[mapping.appField] = row[mapping.csvColumn]
+        })
+        const { category, subcategory } = CsvHelper.splitCategory(mappedRow.category)
+        mappedRow.category = category
+        mappedRow.subcategory = subcategory
+
+        //normalize amount
+        mappedRow.amount = CsvHelper.normalizeAmount(mappedRow.amount)
+
+        // Lookup Category
+        const matchedCategory = categories.find(c => c.label.toLowerCase() === (mappedRow.category || '').toLowerCase())
+        const categoryId = matchedCategory ? matchedCategory.id : null
+
+        // Lookup Payee
+        const matchedPayee = payees.find((p: any) => p.name.toLowerCase() === (mappedRow.payee || '').toLowerCase())
+        let payeeId = null;
+        const payeeName = (mappedRow.payee || '').trim();
+
+        if (!matchedPayee && payeeName) {
+          const payee = await TransactionRepo.addPayee({ name: payeeName })
+          payeeId = payee.id
+        } else if (matchedPayee) {
+          payeeId = matchedPayee.id
+        } else {
+          // Fallback if no name provided
+          payeeId = '1'
+        }
+
+        // Parse Date
+        let createdAt = Date.now()
+        if (mappedRow.date) {
+          let normalized: string | null = null
+
+          if (dateFormat) {
+            normalized = CsvHelper.normalizeDate(mappedRow.date, dateFormat)
+          }
+
+          // Fallback: Try per-row detection if global failed
+          if (!normalized) {
+            const rowFormat = CsvHelper.detectDateFormat(mappedRow.date)
+            if (rowFormat) {
+              normalized = CsvHelper.normalizeDate(mappedRow.date, rowFormat)
+            }
+          }
+
+          if (normalized) {
+            createdAt = new Date(normalized).getTime()
+          } else {
+            // Last resort: Strict parse
+            const direct = new Date(mappedRow.date).getTime()
+            if (!isNaN(direct)) createdAt = direct
+          }
+        }
+        //account id
+        let accountId = null
+        const r = await first<any>('SELECT id FROM accounts LIMIT 1');
+        if (r && r.id) accountId = r.id;
+
+        // Construct Transaction
+        const transaction: Transaction = {
+          id: uuidSync(),
+          amount: parseFloat(mappedRow.amount || '0'),
+          comment: mappedRow.notes || null,
+          accountId: accountId,
+          payeeId: payeeId,
+          categoryId: categoryId,
+          status: 'cleared',
+          createdAt: createdAt,
+          deleted: 0
+        }
+        transactions.push(transaction)
+        await TransactionRepo.create(transaction)
+      }
+      await exec('COMMIT')
+
+      // finish up animation
+      setProgress(1)
+      await new Promise(r => setTimeout(r, 500))
+
+      setIsLoading(false)
+      console.log(transactions.length + " Transactions imported")
+      navigation.goBack()
+
+    } catch (err) {
+      console.error('Import failed', err)
+      await exec('ROLLBACK')
+      alert('Import failed. See console for details.')
+      setIsLoading(false)
+    }
+  }
+
+  if (isLoading) {
+    return <WaveLoading progress={progress} message={`Importing ${rows.length} transactions...`} />
   }
 
   return (
@@ -90,7 +213,7 @@ export default function ImportCsvScreen() {
 
             <CsvPreviewTable
               headers={headers}
-              rows={rows}
+              rows={rows.slice(0, 50)}
               mappings={mappings}
               onMappingChange={setMappings}
             />

@@ -77,5 +77,73 @@ export const addExpenseStyles = (scheme: any) => {
     saveButton: {
       flex: 1,
     },
+
+    // Glass Base (Common)
+    glassBase: {
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2, 
+      shadowRadius: 8,
+      elevation: 4,
+    },
+
+    // Glass Jelly Toggle Styles
+    glassToggleContainer: {
+      flexDirection: 'row',
+      width: '100%',
+      backgroundColor: colors.glassBg,
+      borderRadius: 30,
+      padding: 4,
+      height: 56,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    glassTrack: {
+      flex: 1,
+      flexDirection: 'row',
+      zIndex: 2,
+    },
+    glassItem: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 2,
+    },
+    glassActivePill: {
+      position: 'absolute',
+      width: '50%',
+      top: 4,
+      bottom: 4,
+      borderRadius: 26,
+      zIndex: 1,
+    },
+    glassLabel: {
+      fontWeight: '600',
+      fontSize: 16,
+      color: colors.muted,
+    },
+    glassLabelActive: {
+      color: colors.text,
+      fontWeight: '700',
+    },
+
+    // Glass Save Button
+    glassSaveButton: {
+      backgroundColor: colors.primary,
+      height: 52,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    glassSaveButtonText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+      textShadowColor: colors.glassBorder,
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
   });
 };

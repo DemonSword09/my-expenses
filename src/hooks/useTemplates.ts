@@ -133,7 +133,7 @@ export default function useTemplates() {
     const allTemplates = await TemplateRepo.listTemplates();
     
     // 2. Filter for recurring
-    const recurring = allTemplates.filter(t => t.is_recurring && t.cron_expression);
+    const recurring = allTemplates.filter(t => t.is_recurring && t.cron_expression && t.recurring_rule_id);
 
     const schedule: Array<{
       date: Date;
@@ -149,16 +149,37 @@ export default function useTemplates() {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // optimization: fetch all executed transactions for these rules? 
-    // Or for each rule, fetch executed. Since number of rules is likely small, sequential or parallel fetch is fine.
+    // Pre-fetch transactions for all rules in parallel
+    const ruleIds = recurring.map(t => t.recurring_rule_id!);
     
+    // Check if repo has the new method (it should)
+    let transactions: any[] = [];
+    const startMs = start.getTime() - 86400000; 
+    const endMs = end.getTime() + 86400000;
+    transactions = await TransactionRepo.findForRulesInRange(ruleIds, startMs, endMs);
+    
+
+    const txnsMap: Record<string, any[]> = {};
+    // Group by rule ID
+    transactions.forEach(t => {
+        if (t.recurring_rule_id) {
+            if (!txnsMap[t.recurring_rule_id]) txnsMap[t.recurring_rule_id] = [];
+            txnsMap[t.recurring_rule_id].push(t);
+        }
+    });
+
     for (const t of recurring) {
-      if (!t.recurring_rule_id) continue;
+      const rid = t.recurring_rule_id!;
+      const executed = txnsMap[rid] || [];
       
       try {
-        // Fetch executed txns for this rule
-        const executed = await TransactionRepo.findByRecurringRule(t.recurring_rule_id);
-        
+        // Pre-parse amount from template
+        let baseAmount = 0;
+        try {
+          const access = JSON.parse(t.template_json);
+          baseAmount = access.amount || 0;
+        } catch {}
+
         const options = {
           currentDate: start,
           endDate: end,
@@ -172,13 +193,29 @@ export default function useTemplates() {
             const obj = interval.next();
             const date = obj.toDate();
             
-            // Check if executed on this date (simple day match)
+            // Recurrence Logic: "Before Creation" Rule
+            // If the generated date is before the rule/template creation date,
+            // we should generally ignore it, UNLESS an execution actually exists for it.
+            // (This matches RecurrenceCalendarModal logic)
+            const createdLimit = t.created_at || 0;
+            // helper to check if date is strictly before creation (ignoring time if desired, but crude check is fine)
+            // RecurrenceCalendarModal checks 'date.getTime() < template.created_at' strictly.
+            const isPreCreation = date.getTime() < createdLimit;
+
             const executedTxn = executed.find(txn => {
                 const txnDate = new Date(txn.createdAt);
                 return txnDate.getFullYear() === date.getFullYear() &&
                        txnDate.getMonth() === date.getMonth() && 
                        txnDate.getDate() === date.getDate();
             });
+
+            // SKIP if pre-creation and NOT executed
+            if (isPreCreation && !executedTxn) {
+                // However, we must verify if we should checking against t.created_at or rule.created_at?
+                // RecurrenceCalendarModal uses `template.created_at`.
+                // Assuming consistency, we validly skip.
+                continue; 
+            }
 
             let status: 'executed' | 'missed' | 'pending' = 'pending';
             let transactionId: string | undefined = undefined;
@@ -194,21 +231,14 @@ export default function useTemplates() {
                 }
             }
 
-            // Extract amount from template_json
-            let amount = 0;
-            try {
-              const access = JSON.parse(t.template_json);
-              amount = access.amount || 0;
-            } catch {}
-
             schedule.push({
               date,
               templateName: t.name,
-              amount,
+              amount: baseAmount,
               status,
               templateId: t.id,
               transactionId,
-              recurringRuleId: t.recurring_rule_id,
+              recurringRuleId: rid,
               templateJson: t.template_json,
             });
           } catch (e) {

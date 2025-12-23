@@ -1,7 +1,7 @@
 // src/db/repositories/TransactionRepo.ts
 
 import { all, run, first } from '../sqlite';
-import type { Transaction, Payee } from '../models';
+import type { Transaction, Payee, TransactionDetail } from '../models';
 import { uuidSync } from '../../utils/uuid';
 
 const DEFAULT_ACCOUNT_LABEL = 'Default Account';
@@ -37,7 +37,7 @@ export const TransactionRepo = {
 
     const t: Transaction = {
       id,
-      amount: partial.amount ?? 0,
+      amount: Math.abs(partial.amount ?? 0),
       comment: partial.comment ?? null,
       accountId,
       payeeId: partial.payeeId ?? null,
@@ -92,7 +92,46 @@ export const TransactionRepo = {
       createdAt: r.createdAt,
       updatedAt: r.updatedAt ?? null,
       deleted: r.deleted ?? 0,
+      recurring_rule_id: r.recurring_rule_id,
     })) as Transaction[];
+  },
+
+  async listWithDetails(): Promise<TransactionDetail[]> {
+    const sql = `
+      SELECT t.*, 
+             p.name as payee_name, 
+             c.label as category_label, 
+             c.icon as category_icon,
+             c.color as category_color,
+             parent.label as parent_category_label
+      FROM transactions t
+      LEFT JOIN payees p ON t.payeeId = p.id
+      LEFT JOIN categories c ON t.categoryId = c.id
+      LEFT JOIN categories parent ON c.parentId = parent.id
+      WHERE t.deleted = 0 
+      ORDER BY t.createdAt DESC
+    `;
+    const rows = await all<any>(sql);
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+      recurring_rule_id: r.recurring_rule_id,
+      payee_name: r.payee_name ?? null,
+      category_label: r.category_label ?? null,
+      category_parent_label: r.parent_category_label ?? null,
+      category_icon: r.category_icon ?? null,
+      category_color: r.category_color ?? null,
+    }));
   },
 
   async findById(id: string): Promise<Transaction | null> {
@@ -119,6 +158,9 @@ export const TransactionRepo = {
     const existing = await this.findById(id);
     if (!existing) return null;
     const merged = { ...existing, ...patch, updatedAt: now };
+    // Ensure amount is always absolute (unsigned behavior)
+    if (merged.amount) merged.amount = Math.abs(merged.amount);
+
     await run(
       `UPDATE transactions SET amount = ?, comment = ?, accountId = ?, payeeId = ?, categoryId = ?, status = ?, cr_amount = ?, transaction_type = ?, createdAt = ?, updatedAt = ?, deleted = ? WHERE id = ?`,
       [
@@ -179,6 +221,13 @@ export const TransactionRepo = {
     // Use COLLATE NOCASE for case-insensitive match
     await run(`INSERT OR IGNORE INTO payees (id, name) VALUES (?, ?)`, [id, name]);
 
+    const final = await first<{ id: string; name: string }>(
+      `SELECT id, name FROM payees WHERE name = ? COLLATE NOCASE LIMIT 1`,
+      [name],
+    );
+    if (final) return { id: final.id, name: final.name } as Payee;
+
+    // Should not happen unless insert failed silently and select failed
     return { id, name } as Payee;
   },
 
@@ -231,6 +280,33 @@ export const TransactionRepo = {
     const rows = await all<any>(
       'SELECT * FROM transactions WHERE recurring_rule_id = ? AND deleted = 0 ORDER BY createdAt ASC',
       [ruleId]
+    );
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      amount: r.amount,
+      comment: r.comment ?? null,
+      accountId: r.accountId,
+      payeeId: r.payeeId ?? null,
+      categoryId: r.categoryId ?? null,
+      status: r.status ?? null,
+      cr_amount: r.cr_amount ?? null,
+      transaction_type: r.transaction_type ?? null,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt ?? null,
+      deleted: r.deleted ?? 0,
+      recurring_rule_id: r.recurring_rule_id,
+    })) as Transaction[];
+  },
+
+  async findForRulesInRange(ruleIds: string[], startMs: number, endMs: number): Promise<Transaction[]> {
+    if (ruleIds.length === 0) return [];
+    const placeholders = ruleIds.map(() => '?').join(',');
+    const rows = await all<any>(
+      `SELECT * FROM transactions 
+       WHERE recurring_rule_id IN (${placeholders}) 
+       AND createdAt >= ? AND createdAt <= ? 
+       AND deleted = 0`,
+      [...ruleIds, startMs, endMs]
     );
     return (rows || []).map((r: any) => ({
       id: r.id,

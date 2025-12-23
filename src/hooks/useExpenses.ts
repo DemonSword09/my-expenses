@@ -4,13 +4,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
 import { CategoryRepo } from '../db/repositories/CategoryRepo';
 import { all } from '../db/sqlite';
-import type { Transaction, Category } from '../db/models';
+import type { Transaction, Category, TransactionDetail } from '../db/models';
 import { useRef } from 'react';
 
 export type FilterMode = 'all' | 'week' | 'month';
 
 export default function useExpenses() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
   const [categoriesMap, setCategoriesMap] = useState<Record<string, Category>>({});
   const [payeesMap, setPayeesMap] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +46,8 @@ export default function useExpenses() {
 
   const load = useCallback(async () => {
     try {
-      const rows = await TransactionRepo.listAll();
+      // Optimized: use JOINs instead of client-side lookups for list
+      const rows = await TransactionRepo.listWithDetails();
       if (mounted.current) setTransactions(rows);
     } catch (err) {
       console.error('useExpenses: failed to load transactions', err);
@@ -79,10 +80,10 @@ export default function useExpenses() {
 
   const resolveCategoryHeading = useCallback(
     (categoryId?: string | null) => {
+      // Keep this for external consumers or fallback
       if (!categoryId) return 'Uncategorized';
       const cat = categoriesMap[categoryId];
       if (!cat) return 'Category';
-      // categories may have parentId typed differently across codebase
       const parentId = (cat as any).parentId as string | undefined;
       const label = (cat as any).label ?? (cat as any).name ?? 'Category';
       if (parentId) {
@@ -116,8 +117,19 @@ export default function useExpenses() {
 
       if (!q) return true;
 
-      const payee = t.payeeId ? (payeesMap[t.payeeId] ?? '').toLowerCase() : '';
-      const cat = resolveCategoryHeading(t.categoryId).toLowerCase();
+      // Search using pre-joined fields first, fallback to maps
+      const payee = (t.payee_name ?? payeesMap[t.payeeId ?? ''] ?? '').toLowerCase();
+      
+      let cat = '';
+      if (t.category_label) {
+         cat = t.category_parent_label 
+            ? `${t.category_parent_label} > ${t.category_label}` 
+            : t.category_label;
+      } else {
+         cat = resolveCategoryHeading(t.categoryId); // fallback
+      }
+      cat = cat.toLowerCase();
+
       const comment = (t.comment ?? '').toLowerCase();
       return payee.includes(q) || cat.includes(q) || comment.includes(q);
     });

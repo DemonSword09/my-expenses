@@ -20,14 +20,14 @@ export interface ExpenseListItemProps {
  * ExpenseListItem - small, theme-aware row component for an expense.
  * Uses useTheme() so colors/spacings are centralized.
  */
-export default function ExpenseListItem({
+const ExpenseListItem = React.memo(({
   item,
   onPress,
   onLongPress,
   isCompact = false,
   selectionMode = false,
   isSelected = false,
-}: ExpenseListItemProps) {
+}: ExpenseListItemProps) => {
   const { schemeColors, expenseListStyle } = useTheme();
 
   // Attempt to resolve category info if available in item.category (some codebases attach resolved)
@@ -103,13 +103,16 @@ export default function ExpenseListItem({
       </View>
     </TouchableOpacity>
   );
-}
+});
+
+export default ExpenseListItem;
 
 /* Local helper kept small so component is self-contained */
-function formatCurrency(amount: number, currency = 'INR') {
+const CURRENCY_FORMATTER = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'INR' });
+function formatCurrency(amount: number) {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+    return CURRENCY_FORMATTER.format(amount);
   } catch {
-    return `${amount.toFixed(2)} ${currency}`;
+    return `${amount.toFixed(2)} INR`;
   }
 }

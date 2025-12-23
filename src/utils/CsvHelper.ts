@@ -25,16 +25,27 @@ export class CsvHelper {
   }
 
   static detectDateFormat(sample: string): string | null {
+    let cleanSample = sample.trim()
+    // Normalize JAN -> Jan, DEC -> Dec, etc.
+    cleanSample = cleanSample.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
+      match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
+    )
     const formats = [
       'YYYY-MM-DD',
       'DD/MM/YYYY',
       'MM/DD/YYYY',
+      'D-MMM-YYYY', // Flexible: handles 1-Jan-2023 and 10-Jan-2023
+      'D-MMM-YY',   // Flexible: handles 1-Jan-23 and 10-Jan-23
+      'DD-MMM-YYYY',
+      'DD-MMM-YY',
       'DD-MM-YYYY',
       'MMM DD, YYYY',
     ]
 
     for (const format of formats) {
-      if (dayjs(sample, format, true).isValid()) {
+      const isValid = dayjs(cleanSample, format, true).isValid()
+      // console.log(`[CsvHelper] Checking format ${format}: ${isValid}`)
+      if (isValid) {
         return format
       }
     }
@@ -45,7 +56,12 @@ export class CsvHelper {
     value: string,
     format: string
   ): string | null {
-    const parsed = dayjs(value, format, true)
+    let cleanValue = value.trim()
+    // Normalize JAN -> Jan, DEC -> Dec, etc.
+    cleanValue = cleanValue.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
+      match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
+    )
+    const parsed = dayjs(cleanValue, format, true)
     return parsed.isValid() ? parsed.toISOString() : null
   }
 

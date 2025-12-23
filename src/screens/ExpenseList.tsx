@@ -64,7 +64,7 @@ export default function ExpenseListScreen() {
   // bulk edit state
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const [payeePickerVisible, setPayeePickerVisible] = useState(false);
-  
+
   // Hierarchical picker state
   const [pickerCategories, setPickerCategories] = useState<Category[]>([]);
   const [pickerStackParents, setPickerStackParents] = useState<Array<{ id: string | null; label?: string }>>([
@@ -73,35 +73,35 @@ export default function ExpenseListScreen() {
 
   const handleBulkCategory = async (c: Category) => {
     try {
-        await TransactionRepo.updateCategoryForMultiple(Array.from(selectedIds), c.id);
-        setCategoryPickerVisible(false);
-        exitSelectionMode();
-        refresh();
+      await TransactionRepo.updateCategoryForMultiple(Array.from(selectedIds), c.id);
+      setCategoryPickerVisible(false);
+      exitSelectionMode();
+      refresh();
     } catch (err) {
-        console.error('Bulk category update failed', err);
-        Alert.alert('Error', 'Failed to update category');
+      console.error('Bulk category update failed', err);
+      Alert.alert('Error', 'Failed to update category');
     }
   };
 
-  const handleBulkPayee = async (p: {id: string}) => {
-     try {
-        await TransactionRepo.updatePayeeForMultiple(Array.from(selectedIds), p.id);
-        setPayeePickerVisible(false);
-        exitSelectionMode();
-        refresh();
-     } catch (err) {
-        console.error('Bulk payee update failed', err);
-        Alert.alert('Error', 'Failed to update payee');
-     }
+  const handleBulkPayee = async (p: { id: string }) => {
+    try {
+      await TransactionRepo.updatePayeeForMultiple(Array.from(selectedIds), p.id);
+      setPayeePickerVisible(false);
+      exitSelectionMode();
+      refresh();
+    } catch (err) {
+      console.error('Bulk payee update failed', err);
+      Alert.alert('Error', 'Failed to update payee');
+    }
   };
 
   const loadPickerCategories = useCallback(async (parentId: string | null) => {
     try {
-        const rows = await CategoryRepo.listByParent(parentId);
-        setPickerCategories(rows);
+      const rows = await CategoryRepo.listByParent(parentId);
+      setPickerCategories(rows);
     } catch (err) {
-        console.error('ExpenseList: failed loading picker categories', err);
-        setPickerCategories([]);
+      console.error('ExpenseList: failed loading picker categories', err);
+      setPickerCategories([]);
     }
   }, []);
 
@@ -113,29 +113,29 @@ export default function ExpenseListScreen() {
 
   const onPickerCategoryPress = useCallback(async (cat: Category) => {
     try {
-        const children = await CategoryRepo.listByParent(cat.id);
-        if (children && children.length > 0) {
-            setPickerStackParents((p) => [...p, { id: cat.id, label: cat.label }]);
-            setPickerCategories(children);
-        } else {
-            handleBulkCategory(cat);
-        }
-    } catch (err) {
-        console.error('ExpenseList: failed resolving children', err);
+      const children = await CategoryRepo.listByParent(cat.id);
+      if (children && children.length > 0) {
+        setPickerStackParents((p) => [...p, { id: cat.id, label: cat.label }]);
+        setPickerCategories(children);
+      } else {
         handleBulkCategory(cat);
+      }
+    } catch (err) {
+      console.error('ExpenseList: failed resolving children', err);
+      handleBulkCategory(cat);
     }
   }, [handleBulkCategory]);
 
   const onPickerBackStack = useCallback(() => {
     setPickerStackParents((prev) => {
-        if (prev.length <= 1) {
-            setCategoryPickerVisible(false);
-            return prev;
-        }
-        const next = prev.slice(0, prev.length - 1);
-        const parentId = next[next.length - 1].id ?? null;
-        loadPickerCategories(parentId);
-        return next;
+      if (prev.length <= 1) {
+        setCategoryPickerVisible(false);
+        return prev;
+      }
+      const next = prev.slice(0, prev.length - 1);
+      const parentId = next[next.length - 1].id ?? null;
+      loadPickerCategories(parentId);
+      return next;
     });
   }, [loadPickerCategories]);
 
@@ -159,10 +159,36 @@ export default function ExpenseListScreen() {
 
   // PREPARE transactions with resolved metadata once (performance)
   const preparedTransactions = useMemo(() => {
-    return filteredTransactions.map((t) => {
-      const category = resolveCategory(t.categoryId);
-      const heading = resolveCategoryHeading(t.categoryId);
-      const payeeName = t.payeeId ? (payeesMap[t.payeeId] ?? '') : '';
+    return filteredTransactions.map((t: any) => {
+      // Use pre-joined SQL fields if available, otherwise fallback to map lookups
+
+      // 1. Resolve Category Object (for icon/color)
+      let category: any = null;
+      if (t.category_label) {
+        // Construct standard category object from joined fields
+        category = {
+          id: t.categoryId,
+          label: t.category_label,
+          icon: t.category_icon,
+          color: t.category_color,
+        };
+      } else {
+        category = resolveCategory(t.categoryId);
+      }
+
+      // 2. Resolve Heading (Parent > Child)
+      let heading = '';
+      if (t.category_label) {
+        heading = t.category_parent_label
+          ? `${t.category_parent_label} > ${t.category_label}`
+          : t.category_label;
+      } else {
+        heading = resolveCategoryHeading(t.categoryId);
+      }
+
+      // 3. Resolve Payee Name
+      const payeeName = t.payee_name || (t.payeeId ? (payeesMap[t.payeeId] ?? '') : '');
+
       // Attach lightweight metadata that ExpenseListItem expects
       return {
         ...t,
@@ -217,6 +243,11 @@ export default function ExpenseListScreen() {
     setSelectedIds(new Set());
   };
 
+  const selectAll = () => {
+    const allIds = preparedTransactions.map(t => t.id)
+    setSelectedIds(new Set(allIds))
+  }
+
   const confirmBulkDelete = () => {
     Alert.alert(
       'Delete Transactions',
@@ -249,7 +280,7 @@ export default function ExpenseListScreen() {
     else totalBalance += t.amount;
   });
 
-  const renderItem = ({ item }: { item: Transaction & any }) => {
+  const renderItem = useCallback(({ item }: { item: Transaction & any }) => {
     // item already has __category/__heading/__payeeName attached
     return (
       <ExpenseListItem
@@ -260,7 +291,7 @@ export default function ExpenseListScreen() {
         isSelected={selectedIds.has(item.id)}
       />
     );
-  };
+  }, [selectionMode, selectedIds, onPressItem, onLongPressItem]);
 
   return (
     <View style={expenseListStyle.container}>
@@ -272,13 +303,14 @@ export default function ExpenseListScreen() {
               title={`${selectedIds.size} selected`}
               titleStyle={{ fontWeight: 'bold', color: schemeColors.text }}
             />
+            <Appbar.Action icon="checkbox-multiple-marked-outline" onPress={selectAll} color={schemeColors.primary} />
             <Appbar.Action icon="tag-multiple" onPress={openCategoryPicker} color={schemeColors.primary} />
             <Appbar.Action icon="account-multiple" onPress={() => setPayeePickerVisible(true)} color={schemeColors.primary} />
             <Appbar.Action icon="trash-can-outline" onPress={confirmBulkDelete} color={schemeColors.danger} />
           </>
         ) : (
           <>
-            <Appbar.Action icon="menu" color={schemeColors.primary} onPress={() => {}} />
+            <Appbar.Action icon="menu" color={schemeColors.primary} onPress={() => { }} />
             <Appbar.Content
               title={
                 <View>
@@ -292,7 +324,7 @@ export default function ExpenseListScreen() {
                     }}
                   >
                     {' '}
-                    ₹{totalBalance}
+                    ₹{totalBalance.toFixed(2)}
                   </Text>
                 </View>
               }
@@ -303,8 +335,8 @@ export default function ExpenseListScreen() {
               onPress={() => navigation.navigate('Templates' as never)}
             />
             <Appbar.Action color={schemeColors.primary} icon="dots-vertical" onPress={openMenu} />
-            
-             <Modal
+
+            <Modal
               transparent
               visible={menuVisible}
               animationType="fade"
@@ -325,7 +357,7 @@ export default function ExpenseListScreen() {
           </>
         )}
       </Appbar.Header>
-      
+
       {/* Search + filters  */}
       {!selectionMode && (
         <View style={globalStyle.searchBlock}>

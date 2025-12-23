@@ -51,6 +51,10 @@ export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
         text: COLORS.white,
         textMuted: COLORS.muted,
         border: 'rgba(255,255,255,0.1)',
+        // Glass specific
+        glassBg: 'rgba(255,255,255,0.08)',
+        glassBorder: 'rgba(255,255,255,0.1)',
+        shadow: '#000',
       }
     : {
         success: COLORS.success,
@@ -63,5 +67,9 @@ export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
         textMuted: COLORS.textMuted,
         border: COLORS.border,
         divider: COLORS.divider,
+        // Glass specific - slightly more visible on light
+        glassBg: 'rgba(255,255,255,0.6)', 
+        glassBorder: 'rgba(255,255,255,0.4)',
+        shadow: '#000',
       };
 }
