@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import useTheme from '../hooks/useTheme';
 import { Appbar } from 'react-native-paper';
-import AddExpenseForm from '@src/components/AddExpenseForm';
+import AddExpenseForm from '@src/components/Expenses/AddExpenseForm';
 
 /**
  * Thin screen wiring into useAddExpense + CategoryPicker.

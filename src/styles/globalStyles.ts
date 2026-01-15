@@ -1,6 +1,6 @@
 // src/styles/globalStyles.ts
 import { StyleSheet, Platform } from 'react-native';
-import { getThemeColors, SPACING, RADIUS, COLORS } from './theme';
+import { getThemeColors, SPACING, RADIUS, COLORS, SHADOWS } from './theme';
 
 export const globalStyles = (scheme: any) => {
   const schemeColors = getThemeColors(scheme);
@@ -9,10 +9,10 @@ export const globalStyles = (scheme: any) => {
     // containers
     container: {
       flex: 1,
-      backgroundColor: schemeColors.background,
+      backgroundColor: schemeColors.bgDark, // Base
     },
     surface: {
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid, // Surface
     },
 
     // header row
@@ -27,7 +27,7 @@ export const globalStyles = (scheme: any) => {
     headerTitle: {
       fontSize: 20,
       fontWeight: '600',
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       textAlign: 'center',
     },
 
@@ -54,7 +54,7 @@ export const globalStyles = (scheme: any) => {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: schemeColors.primary,
-      elevation: 4,
+      ...SHADOWS.glow, // Restored glow
     },
     fabText: {
       color: colors.white,
@@ -68,12 +68,23 @@ export const globalStyles = (scheme: any) => {
       marginBottom: SPACING.lg,
     },
     searchInput: {
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid,
       borderRadius: RADIUS.md,
       paddingHorizontal: 12,
       paddingVertical: 10,
       marginBottom: 10,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
+    },
+
+    // generic input
+    input: {
+      backgroundColor: schemeColors.bgMid,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: schemeColors.textStrong,
+      borderWidth: 1,
+      borderColor: schemeColors.border,
     },
 
     // filter pills
@@ -82,15 +93,17 @@ export const globalStyles = (scheme: any) => {
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 9999,
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid,
       marginRight: 8,
-      borderWidth: 0,
+      borderWidth: 1,
+      borderColor: schemeColors.border, // Subtle border
     },
     filterPillActive: {
       backgroundColor: schemeColors.primary,
+      borderColor: schemeColors.primary,
     },
     filterText: {
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       fontWeight: '600',
     },
     filterTextActive: {
@@ -122,14 +135,11 @@ export const globalStyles = (scheme: any) => {
       padding: 20,
     },
     formSection: {
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid,
       borderRadius: RADIUS.lg,
       marginBottom: 20,
-      shadowColor: schemeColors.primary, // Glow color
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15, // Glow intensity
-      shadowRadius: 12, // Glow diffusion
-      elevation: 4,
+      ...SHADOWS.glow, // Restored glow
+      shadowOpacity: 0.15, // Tweak opacity for form section specifically if needed
       borderWidth: 1,
       borderColor: schemeColors.border,
       overflow: 'visible',
@@ -139,7 +149,7 @@ export const globalStyles = (scheme: any) => {
       alignItems: 'center',
       padding: 20,
       borderBottomWidth: 1,
-      borderBottomColor: schemeColors.divider, // Use divider color
+      borderBottomColor: schemeColors.border, // Use border token
       minHeight: 56,
     },
     formRowLast: {
@@ -148,19 +158,19 @@ export const globalStyles = (scheme: any) => {
     formLabel: {
       fontSize: 16,
       width: 100,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       fontWeight: '500',
     },
     formInput: {
       flex: 1,
       fontSize: 16,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       textAlign: 'right',
     },
     formValue: {
       flex: 1,
       fontSize: 16,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       textAlign: 'right',
     },
 
@@ -175,23 +185,23 @@ export const globalStyles = (scheme: any) => {
     rowLabel: {
       fontSize: 16,
       width: 100,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       fontWeight: '500',
     },
     rowInput: {
       flex: 1,
       fontSize: 16,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       textAlign: 'right',
     },
     rowValue: {
       flex: 1,
       fontSize: 16,
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       textAlign: 'right',
     },
     rowPlaceholder: {
-      color: schemeColors.muted,
+      color: schemeColors.textMuted,
     },
 
     // section header
@@ -202,7 +212,7 @@ export const globalStyles = (scheme: any) => {
       marginTop: 20,
       marginLeft: 20, // Align with card padding
       textTransform: 'uppercase',
-      color: '#7C8395',
+      color: schemeColors.textMuted,
       letterSpacing: 1,
     },
 
@@ -213,11 +223,7 @@ export const globalStyles = (scheme: any) => {
       borderRadius: RADIUS.md, // 12px
       alignItems: 'center',
       justifyContent: 'center',
-      shadowColor: schemeColors.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 4,
+      ...SHADOWS.glow, // Restored glow
     },
     primaryButtonText: {
       color: colors.white,
@@ -225,7 +231,7 @@ export const globalStyles = (scheme: any) => {
       fontWeight: '700',
     },
     secondaryButton: {
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid,
       height: 52,
       borderRadius: RADIUS.md,
       alignItems: 'center',
@@ -234,7 +240,7 @@ export const globalStyles = (scheme: any) => {
       borderColor: schemeColors.border,
     },
     secondaryButtonText: {
-      color: schemeColors.text,
+      color: schemeColors.textStrong,
       fontSize: 16,
       fontWeight: '600',
     },
@@ -242,23 +248,20 @@ export const globalStyles = (scheme: any) => {
     // modal sheet (action sheet / confirm)
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
     modalSheet: {
-      backgroundColor: schemeColors.surface,
+      backgroundColor: schemeColors.bgMid,
       padding: 12,
       borderTopLeftRadius: RADIUS.md,
       borderTopRightRadius: RADIUS.md,
+      ...SHADOWS.lg,
     },
     modalRow: { paddingVertical: 12, flexDirection: 'row' },
-    modalRowText: { fontSize: 16, color: schemeColors.text, paddingLeft: 8 },
+    modalRowText: { fontSize: 16, color: schemeColors.textStrong, paddingLeft: 8 },
 
     // Glass Base (available globally)
     glassBase: {
       borderWidth: 1,
-      borderColor: schemeColors.glassBorder, // Global uses schemeColors directly which calls getThemeColors
-      shadowColor: schemeColors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 4,
+      borderColor: schemeColors.glassBorder,
+      ...SHADOWS.sm,
     },
   });
 };

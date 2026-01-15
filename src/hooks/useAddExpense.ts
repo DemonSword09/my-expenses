@@ -1,11 +1,15 @@
 // src/hooks/useAddExpense.ts
 import { useEffect, useState, useCallback } from 'react';
 import { Platform, Alert } from 'react-native';
-import { CategoryRepo } from '../db/repositories/CategoryRepo';
+import { TransactionDAO } from '../db/dao/TransactionDAO';
+import { TransactionService } from '../services/TransactionService';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
 import type { Category, Payee, Transaction } from '../db/models';
-import { first, all } from '../db/sqlite';
-import { useNavigation } from '@react-navigation/native';
+import { useAppData } from '../context/AppDataProvider';
+
+import { CategoryRepo } from '../db/repositories/CategoryRepo';
+
+type CategoryNode = Category & { children: Category[] };
 
 type UseAddExpenseReturn = {
   merchant: string;
@@ -25,12 +29,10 @@ type UseAddExpenseReturn = {
   catModalVisible: boolean;
   openCategoryPicker: () => Promise<void>;
   closeCategoryPicker: () => void;
-  stackParents: Array<{ id: string | null; label?: string }>;
-  categories: Category[];
+  categories: CategoryNode[];
   selectedCategory: Category | null;
-  onCategoryPress: (c: Category) => Promise<void>;
+  onCategoryPress: (c: Category) => void; // Sync wrapper or just async passed as void
   onCategorySelect: (c: Category) => void;
-  onBackStack: () => Promise<void>;
 
   loading: boolean;
 
@@ -41,16 +43,16 @@ type UseAddExpenseReturn = {
 };
 
 export default function useAddExpense(editId?: string | undefined, initialData?: any): UseAddExpenseReturn {
+  const { categories: allCategories, payees: allPayees, refreshData } = useAppData();
+
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
 
   const [catModalVisible, setCatModalVisible] = useState(false);
-  const [stackParents, setStackParents] = useState<Array<{ id: string | null; label?: string }>>([
-    { id: null, label: 'Categories' },
-  ]);
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  const [pickerCategories, setPickerCategories] = useState<CategoryNode[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
   const [dateMs, setDateMs] = useState<number>(Date.now());
@@ -58,14 +60,14 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
 
   const [loading, setLoading] = useState(false);
 
-  // load categories for a parent
-  const loadCategories = useCallback(async (parentId: string | null) => {
+  // load hierarchy
+  const loadPickerHierarchy = useCallback(async () => {
     try {
-      const rows = await CategoryRepo.listByParent(parentId);
-      setCategories(rows);
+      const rows = await CategoryRepo.listHierarchy();
+      setPickerCategories(rows);
     } catch (err) {
-      console.error('useAddExpense: failed loading categories', err);
-      setCategories([]);
+      console.error('useAddExpense: failed loading hierarchy', err);
+      setPickerCategories([]);
     }
   }, []);
 
@@ -74,52 +76,35 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       const t = await TransactionRepo.findById(id);
       if (!t) return;
 
-      // Determine type and absolute amount
-      // If transaction_type is set, use it.
-      // If not, infer from amount sign?
-      // Existing data might be positive for expense if that was the old way.
-      // The user said "default expense".
-      // Let's check if we have `transaction_type` column. Yes, we do.
-      // If `transaction_type` is 'EXPENSE' or null, and amount is positive, we might need to flip it if we want to enforce negative for expense.
-      // BUT, if we are changing the storage convention, we should be careful.
-      // The user said "if expense entered amount is negative".
-      // This implies we should store negative for expense.
-
       let type: 'EXPENSE' | 'INCOME' = 'EXPENSE';
       if (t.transaction_type === 'INCOME') type = 'INCOME';
       else if (t.amount > 0 && t.transaction_type !== 'EXPENSE') {
-        // If amount is positive and type is not explicitly expense, maybe it's income?
-        // Or maybe it's an old expense stored as positive.
-        // Let's rely on `transaction_type` if present.
-        // If not present, default to EXPENSE.
+        // inference logic remains
       }
 
-      // If we are enforcing negative for expense, we should display absolute value.
       setTransactionType(type);
       setAmount(String(Math.abs(t.amount)));
       setNotes(t.comment ?? '');
       setDateMs(t.createdAt ?? Date.now());
+
       if (t.categoryId) {
-        const cat = await CategoryRepo.findById(t.categoryId);
+        const cat = allCategories.find(c => c.id === t.categoryId);
         if (cat) setSelectedCategory(cat);
       }
       if (t.payeeId) {
-        const r: Payee | null = await first('SELECT name FROM payees WHERE id = ? LIMIT 1', [
-          t.payeeId,
-        ]);
-        if (r) setMerchant(r.name);
+        const p = allPayees.find(py => py.id === t.payeeId);
+        if (p) setMerchant(p.name);
+      } else if (t.payeeId === null && merchant) {
+        // keep merchant if set
       }
     } catch (err) {
       console.error('useAddExpense: failed loading transaction', err);
     }
-  }, []);
+  }, [allCategories, allPayees]);
 
   useEffect(() => {
-    // initial load of root categories
-    (async () => {
-      await loadCategories(null);
-    })();
-  }, [loadCategories]);
+    loadPickerHierarchy();
+  }, [loadPickerHierarchy]);
 
   useEffect(() => {
     if (editId) {
@@ -130,54 +115,18 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       // initialize from passed data (e.g. template)
       if (initialData.amount) setAmount(String(initialData.amount));
       if (initialData.comment) setNotes(initialData.comment);
-      if (initialData.merchant) setMerchant(initialData.merchant); // if template has merchant field?
-      // Template might store merchant in 'payee' or similar?
-      // The user said "template json form".
-      // Let's assume the template object structure matches what we need or we map it.
-      // In TemplateEditor, initial.template is passed.
-
-      // If initialData has categoryId, we might need to load it?
-      // But we can just set selectedCategory if we have the full object, or load it if we only have ID.
-      // TemplateEditor passes `template` which might have `categoryId`.
-      if (initialData.categoryId) {
-        // we need to load the category object to set selectedCategory
-        (async () => {
-          const cat = await CategoryRepo.findById(initialData.categoryId);
-          if (cat) setSelectedCategory(cat);
-        })();
-      }
-
-      // For merchant, if it's just a string in template, use it.
-      // If it's a payeeId, we might need to load it.
-      // But templates usually store the raw values for simplicity?
-      // Let's assume 'merchant' property exists or we check 'payee_name' etc.
       if (initialData.merchant) setMerchant(initialData.merchant);
 
-      // Initialize transaction type
+      if (initialData.categoryId) {
+        const cat = allCategories.find(c => c.id === initialData.categoryId);
+        if (cat) setSelectedCategory(cat);
+      }
+
+      if (initialData.merchant) setMerchant(initialData.merchant);
+
       if (initialData.transaction_type) {
         setTransactionType(initialData.transaction_type === 'INCOME' ? 'INCOME' : 'EXPENSE');
-      } else if (initialData.amount && Number(initialData.amount) > 0) {
-        // If positive amount and no type specified, might be income? 
-        // But existing logic stores expenses as positive too? 
-        // Wait, the plan said "Expense: Amount is stored as negative".
-        // But currently `useAddExpense` stores `amount: parsed`.
-        // Let's check `handleSave` again.
-        // `handleSave` currently does `amount: parsed`.
-        // If I change `handleSave` to flip sign, then here I should check sign.
-        // If existing data is positive for expense, then I need to be careful.
-        // The user said "if expense entered amount is negative".
-        // Wait, "if expense entered amount is negative" - this might mean the user wants to enter negative?
-        // No, "if expense entered amount is negative" probably means "if expense, make it negative".
-        // "if income possitive".
-
-        // Let's assume standard behavior:
-        // Expense: User enters 100 -> DB stores -100.
-        // Income: User enters 100 -> DB stores 100.
-
-        // So if I load a transaction:
-        // If amount < 0 -> Expense (and show positive in input).
-        // If amount > 0 -> Income.
-
+      } else if (initialData.amount) {
         const amt = Number(initialData.amount);
         if (amt < 0) {
           setTransactionType('EXPENSE');
@@ -188,7 +137,6 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         }
       }
     } else {
-      // reset to defaults if no editId and no initialData (e.g. creating new)
       setAmount('');
       setMerchant('');
       setNotes('');
@@ -196,39 +144,23 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       setDateMs(Date.now());
       setTransactionType('EXPENSE');
     }
-  }, [editId, loadTransaction, initialData]);
+  }, [editId, loadTransaction, initialData, allCategories]);
 
   const openCategoryPicker = useCallback(async () => {
-    setStackParents([{ id: null, label: 'Categories' }]);
-    await loadCategories(null);
     setCatModalVisible(true);
-  }, [loadCategories]);
+    // ensure hierarchy is loaded
+    if (pickerCategories.length === 0) {
+      loadPickerHierarchy();
+    }
+  }, [pickerCategories, loadPickerHierarchy]);
 
   const closeCategoryPicker = useCallback(() => {
     setCatModalVisible(false);
   }, []);
 
-  // THIS is the key change:
-  // when a category row is tapped, decide whether to navigate into children or select it.
-  const onCategoryPress = useCallback(async (cat: Category) => {
-    try {
-      // check for children
-      const children = await CategoryRepo.listByParent(cat.id);
-      if (children && children.length > 0) {
-        // navigate into children
-        setStackParents((p) => [...p, { id: cat.id, label: cat.label }]);
-        setCategories(children);
-      } else {
-        // no children -> select immediately
-        setSelectedCategory(cat);
-        setCatModalVisible(false);
-      }
-    } catch (err) {
-      console.error('useAddExpense: failed resolving children', err);
-      // fallback: select the category to avoid blocking the user
-      setSelectedCategory(cat);
-      setCatModalVisible(false);
-    }
+  const onCategoryPress = useCallback((cat: Category) => {
+    setSelectedCategory(cat);
+    setCatModalVisible(false);
   }, []);
 
   const onCategorySelect = useCallback((cat: Category) => {
@@ -238,17 +170,15 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
 
   const onMerchantSelect = useCallback(async (payee: Payee) => {
     setMerchant(payee.name);
-
-    // Auto-populate from last transaction for this payee
     if (!editId) {
       try {
-        const lastTxn = await TransactionRepo.getLastByPayee(payee.id);
+        const lastTxn = await TransactionDAO.findLastByPayee(payee.id);
         if (lastTxn) {
           setAmount(String(lastTxn.amount));
           if (lastTxn.comment) setNotes(lastTxn.comment);
 
           if (lastTxn.categoryId) {
-            const cat = await CategoryRepo.findById(lastTxn.categoryId);
+            const cat = allCategories.find(c => c.id === lastTxn.categoryId);
             if (cat) setSelectedCategory(cat);
           }
         }
@@ -256,21 +186,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         console.error('useAddExpense: failed auto-populating from merchant', err);
       }
     }
-  }, [editId]);
-
-  const onBackStack = useCallback(async () => {
-    setStackParents((prev) => {
-      if (prev.length <= 1) {
-        setCatModalVisible(false);
-        return prev;
-      }
-      const next = prev.slice(0, prev.length - 1);
-      const parentId = next[next.length - 1].id ?? null;
-      // load categories for the parent we just navigated back to
-      loadCategories(parentId);
-      return next;
-    });
-  }, [loadCategories]);
+  }, [editId, allCategories]);
 
   const openDatePicker = useCallback(() => setShowPicker(true), []);
   const onDateChange = useCallback((ev: any, d?: Date) => {
@@ -278,43 +194,19 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     if (d) setDateMs(d.getTime());
   }, []);
 
-  const [payees, setPayees] = useState<Payee[]>([]);
-
-  // load payees for autocomplete
-  useEffect(() => {
-    (async () => {
-      try {
-        const rows = await all<Payee>('SELECT * FROM payees ORDER BY name COLLATE NOCASE ASC');
-        setPayees(rows || []);
-      } catch (err) {
-        console.error('useAddExpense: failed loading payees', err);
-      }
-    })();
-  }, []);
-
-  /* const [errors, setErrors] = useState<{ amount?: string }>({}); */ // Removed
-
   const handleSave = useCallback(async () => {
-    /* setErrors({}); */
     setLoading(true);
     try {
-      if (!amount) {
-        /* setErrors({ amount: 'Amount is required' }); */
-        return false;
-      }
+      if (!amount) return false;
 
       const parsed = parseFloat(String(amount).replace(/,/g, ''));
-      if (Number.isNaN(parsed) || parsed <= 0) {
-        /* setErrors({ amount: 'Invalid amount' }); */
-        return false;
-      }
+      if (Number.isNaN(parsed) || parsed <= 0) return false;
 
-      // Apply sign based on type
       const finalAmount = transactionType === 'EXPENSE' ? -Math.abs(parsed) : Math.abs(parsed);
 
       let payeeId: string | null = null;
       if (merchant.trim()) {
-        const p = await TransactionRepo.addPayee({ name: merchant.trim() });
+        const p = await TransactionService.addPayee({ name: merchant.trim() });
         payeeId = p.id;
       }
 
@@ -328,21 +220,18 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       };
 
       if (editId) {
-        if ((TransactionRepo as any).update) {
-          await (TransactionRepo as any).update(editId, {
-            amount: finalAmount,
-            comment: notes || null,
-            categoryId: selectedCategory ? selectedCategory.id : null,
-            createdAt: dateMs,
+        if ((TransactionDAO as any).update) {
+          await (TransactionDAO as any).update(editId, {
+            ...payload,
             updatedAt: Date.now(),
-            transaction_type: transactionType,
           });
-        } else {
-          await TransactionRepo.create({ ...payload, id: editId });
         }
       } else {
-        await TransactionRepo.create(payload);
+        await TransactionService.createTransaction(payload);
       }
+
+      // Refresh global data (especially for new payees)
+      await refreshData();
       return true;
     } catch (err: any) {
       console.error('useAddExpense: save failed', err);
@@ -351,14 +240,13 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     } finally {
       setLoading(false);
     }
-  }, [amount, notes, selectedCategory, dateMs, editId, merchant, transactionType]); // Added transactionType dependency
+  }, [amount, notes, selectedCategory, dateMs, editId, merchant, transactionType, refreshData]);
 
   return {
     merchant,
     setMerchant,
     amount,
     setAmount,
-    // errors,
     notes,
     setNotes,
     transactionType,
@@ -372,15 +260,13 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     catModalVisible,
     openCategoryPicker,
     closeCategoryPicker,
-    stackParents,
-    categories,
+    categories: pickerCategories,
     selectedCategory,
     onCategoryPress,
     onCategorySelect,
-    onBackStack,
 
     loading,
-    payees,
+    payees: allPayees,
     onMerchantSelect,
 
     handleSave,

@@ -28,7 +28,8 @@ export default function CsvPreviewTable({
     mappings: ColumnMapping[]
     onMappingChange: (m: ColumnMapping[]) => void
 }) {
-    const { schemeColors } = useTheme()
+    const { schemeColors, csvPreviewStyle } = useTheme()
+    const styles = csvPreviewStyle
 
     const updateMapping = (csvColumn: string, appField: AppField) => {
         const updated = mappings.filter(m => m.csvColumn !== csvColumn)
@@ -37,17 +38,13 @@ export default function CsvPreviewTable({
     }
 
     return (
-        <ScrollView horizontal style={{ marginTop: 16 }}>
+        <ScrollView horizontal style={styles.container}>
             <View>
-                <View style={{ flexDirection: 'row' }}>
+                <View style={styles.headerRow}>
                     {headers.map(h => (
-                        <View key={h} style={{ width: 120, marginRight: 8 }}>
+                        <View key={h} style={styles.headerCell}>
                             <Text
-                                style={{
-                                    fontWeight: 'bold',
-                                    fontSize: 12,
-                                    color: schemeColors.text
-                                }}
+                                style={styles.headerText}
                                 numberOfLines={1}
                             >
                                 {h}
@@ -59,13 +56,13 @@ export default function CsvPreviewTable({
                                 onValueChange={(value) =>
                                     updateMapping(h, value)
                                 }
-                                style={{ backgroundColor: schemeColors.background }}
+                                style={styles.picker}
                                 dropdownIconColor={schemeColors.text}
                                 dropdownIconRippleColor={schemeColors.border}
                             >
                                 {fields.map(f => (
                                     <Picker.Item key={f} label={f} value={f}
-                                        style={{ fontSize: 13, color: schemeColors.text, backgroundColor: schemeColors.background }} />
+                                        style={styles.pickerItem} />
                                 ))}
                             </Picker>
                         </View>
@@ -73,9 +70,9 @@ export default function CsvPreviewTable({
                 </View>
 
                 {rows.map((row, index) => (
-                    <View key={index} style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: schemeColors.border, paddingVertical: 8 }}>
+                    <View key={index} style={styles.row}>
                         {headers.map(h => (
-                            <Text key={h} style={{ width: 120, marginRight: 8, fontSize: 13, color: schemeColors.text }} numberOfLines={1}>
+                            <Text key={h} style={styles.cellText} numberOfLines={1}>
                                 {row[h]}
                             </Text>
                         ))}

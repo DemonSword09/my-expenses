@@ -1,36 +1,72 @@
-// src/styles/theme.ts
 import { ColorSchemeName } from 'react-native';
 
 export const LIGHT = 'light';
 export const DARK = 'dark';
 
-export const COLORS = {
-  primary: '#2F6BFF',
-  primaryLight: '#AFC7FF',
-  danger: '#FF4D4F',
-  success: '#10B981',
-  bg: '#E9ECF4',
-  surface: '#FFFFFF', // Solid white as requested (no rgba)
-  muted: '#9195A1',
-  text: '#111827', // Keep dark text for contrast
-  textMuted: '#64748B',
-  border: '#E1E4EC', // Solid border color
-  divider: '#E1E4EC',
-  
-  // Dark mode placeholders (can be adjusted if dark mode is a priority, but focusing on the requested light theme for now)
-  darkBg: '#0b1220',
-  darkSurface: '#1b2236',
-  white: '#FFFFFF',
-  gray100: '#F3F4F6',
+// 1. Core HSL Generator
+const hsl = (h: number, s: number, l: number) => `hsl(${h}, ${s}%, ${l}%)`;
+const hsla = (h: number, s: number, l: number, a: number) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
+
+// 2. Configuration & Presets
+const BRAND_HUE = 220; // Matches original #2F6BFF
+const PRESETS = {
+  hue: BRAND_HUE,
+  neutralSat: 25, // Subtle tint for neutrals
+};
+
+// 3. Generators
+const generateNeutrals = (isDark: boolean) => {
+  // Dark Mode: Tinted darks
+  // Light Mode: Tinted whites/grays
+
+  if (isDark) {
+    return {
+      bgDark: hsl(PRESETS.hue, PRESETS.neutralSat, 4),     // Base / Darkest (Tinted)
+      bgMid: hsl(PRESETS.hue, PRESETS.neutralSat, 10),     // Surface / Mid (Tinted)
+      bgLight: hsl(PRESETS.hue, PRESETS.neutralSat, 16),   // Elevated / Lightest (Tinted)
+      textStrong: hsl(PRESETS.hue, 15, 96),                // White with slight cool tint
+      textMuted: hsl(PRESETS.hue, 10, 65),                 // Gray with slight cool tint
+      border: hsl(PRESETS.hue, 15, 20),
+      highlight: hsl(PRESETS.hue, 15, 28),
+    };
+  } else {
+    // Light Mode
+    return {
+      bgDark: hsl(PRESETS.hue, PRESETS.neutralSat, 96),    // Base / Darkest (Cool Gray)
+      bgMid: hsl(PRESETS.hue, PRESETS.neutralSat, 99),     // Surface (Almost White, cool tint)
+      bgLight: hsl(PRESETS.hue, PRESETS.neutralSat, 100),  // Elevated (Pure White-ish)
+      textStrong: hsl(PRESETS.hue, 20, 10),                // Deep Dark Blue/Gray
+      textMuted: hsl(PRESETS.hue, 15, 45),                 // Mid Cool Gray
+      border: hsl(PRESETS.hue, 15, 90),
+      highlight: hsl(PRESETS.hue, 10, 100),
+    };
+  }
+};
+
+const generateBrand = (isDark: boolean) => {
+  // Primary Brand Colors
+  const baseL = 60;
+
+  return {
+    primary: hsl(PRESETS.hue, 100, baseL),
+    primaryHover: hsl(PRESETS.hue, 100, baseL + 6),
+    primaryActive: hsl(PRESETS.hue, 100, baseL - 10),
+    success: hsl(142, 70, 45),
+    warning: hsl(35, 90, 50),
+    error: hsl(0, 80, 60),
+  };
 };
 
 export const SPACING = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
   xl: 20,
   xxl: 24,
+  xxxl: 32,
+  block: 48,
 };
 
 export const RADIUS = {
@@ -39,37 +75,83 @@ export const RADIUS = {
   lg: 16,
 };
 
+// Depth System (Platform compatible)
+export const SHADOWS = {
+  sm: {
+    shadowColor: hsl(PRESETS.hue, 20, 5),
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08, // Reduced from 0.15
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: hsl(PRESETS.hue, 25, 5),
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12, // Reduced from 0.20
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: hsl(PRESETS.hue, 30, 5),
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15, // Reduced from 0.25
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  // Glow effect (Primary)
+  glow: {
+    shadowColor: hsl(PRESETS.hue, 100, 60),
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.20, // Reduced from 0.35
+    shadowRadius: 8,
+    elevation: 6,
+  }
+};
+
+// Generate a default 'light' palette for the legacy COLORS export
+const defaultPalette = {
+  ...generateNeutrals(false),
+  ...generateBrand(false),
+};
+
+export const COLORS = {
+  ...defaultPalette,
+  // Legacy mappings
+  bg: defaultPalette.bgDark,
+  darkBg: hsl(PRESETS.hue, 10, 4),
+  surface: defaultPalette.bgMid,
+  darkSurface: hsl(PRESETS.hue, 10, 10),
+  muted: defaultPalette.textMuted,
+  text: defaultPalette.textStrong,
+  textMuted: defaultPalette.textMuted,
+  divider: defaultPalette.border,
+  danger: defaultPalette.error,
+  white: '#FFFFFF',
+  primaryLight: hsl(PRESETS.hue, 100, 85),
+  gray100: hsl(PRESETS.hue, 5, 96),
+};
+
 export function getThemeColors(scheme: ColorSchemeName = LIGHT) {
-  return scheme === DARK
-    ? {
-        success: COLORS.success,
-        background: COLORS.darkBg,
-        surface: COLORS.darkSurface,
-        primary: COLORS.primary,
-        danger: COLORS.danger,
-        muted: COLORS.muted,
-        text: COLORS.white,
-        textMuted: COLORS.muted,
-        border: 'rgba(255,255,255,0.1)',
-        // Glass specific
-        glassBg: 'rgba(255,255,255,0.08)',
-        glassBorder: 'rgba(255,255,255,0.1)',
-        shadow: '#000',
-      }
-    : {
-        success: COLORS.success,
-        background: COLORS.bg,
-        surface: COLORS.surface,
-        primary: COLORS.primary,
-        danger: COLORS.danger,
-        muted: COLORS.muted,
-        text: COLORS.text,
-        textMuted: COLORS.textMuted,
-        border: COLORS.border,
-        divider: COLORS.divider,
-        // Glass specific - slightly more visible on light
-        glassBg: 'rgba(255,255,255,0.6)', 
-        glassBorder: 'rgba(255,255,255,0.4)',
-        shadow: '#000',
-      };
+  const isDark = scheme === DARK;
+  const neutrals = generateNeutrals(isDark);
+  const brand = generateBrand(isDark);
+
+  return {
+    ...neutrals,
+    ...brand,
+
+    // Legacy Mappings explicitly for the hook
+    background: neutrals.bgDark, // Base
+    surface: neutrals.bgMid,     // Cards/Surface
+    text: neutrals.textStrong,
+    textMuted: neutrals.textMuted,
+    muted: neutrals.textMuted,
+    danger: brand.error,
+    divider: neutrals.border,
+
+    // Glass specific
+    glassBg: isDark ? hsla(0, 0, 100, 0.08) : hsla(0, 0, 100, 0.6),
+    glassBorder: isDark ? hsla(0, 0, 100, 0.1) : hsla(0, 0, 100, 0.4),
+    shadow: isDark ? '#000' : '#000',
+  };
 }

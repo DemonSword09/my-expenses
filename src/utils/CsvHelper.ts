@@ -1,8 +1,5 @@
 import Papa from 'papaparse'
-import dayjs from 'dayjs'
-import customParseFormat from 'dayjs/plugin/customParseFormat'
-
-dayjs.extend(customParseFormat)
+import { parse, isValid, format as formatDate } from 'date-fns'
 
 export class CsvHelper {
   static parseCsv(fileContent: string): Promise<{
@@ -26,27 +23,31 @@ export class CsvHelper {
 
   static detectDateFormat(sample: string): string | null {
     let cleanSample = sample.trim()
-    // Normalize JAN -> Jan, DEC -> Dec, etc.
+    // Normalize JAN -> Jan, DEC -> Dec, etc. only if not already mixed case likely
     cleanSample = cleanSample.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
       match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
     )
+
+    // date-fns format tokens: yyyy, dd, MM
     const formats = [
-      'YYYY-MM-DD',
-      'DD/MM/YYYY',
-      'MM/DD/YYYY',
-      'D-MMM-YYYY', // Flexible: handles 1-Jan-2023 and 10-Jan-2023
-      'D-MMM-YY',   // Flexible: handles 1-Jan-23 and 10-Jan-23
-      'DD-MMM-YYYY',
-      'DD-MMM-YY',
-      'DD-MM-YYYY',
-      'MMM DD, YYYY',
+      'yyyy-MM-dd',
+      'dd/MM/yyyy',
+      'MM/dd/yyyy',
+      'd-MMM-yyyy',
+      'd-MMM-yy',
+      'dd-MMM-yyyy',
+      'dd-MMM-yy',
+      'dd-MM-yyyy',
+      'MMM dd, yyyy',
     ]
 
-    for (const format of formats) {
-      const isValid = dayjs(cleanSample, format, true).isValid()
-      // console.log(`[CsvHelper] Checking format ${format}: ${isValid}`)
-      if (isValid) {
-        return format
+    const now = new Date()
+    for (const fmt of formats) {
+      // strict parsing reference date
+      const parsed = parse(cleanSample, fmt, now)
+      if (isValid(parsed)) {
+        // Check if strict parsing actually matches the length/format roughly to avoid false positives (like 2023-01-01 parsing as d-MMM-yy)
+        return fmt
       }
     }
     return null
@@ -54,15 +55,16 @@ export class CsvHelper {
 
   static normalizeDate(
     value: string,
-    format: string
+    fmt: string
   ): string | null {
     let cleanValue = value.trim()
     // Normalize JAN -> Jan, DEC -> Dec, etc.
     cleanValue = cleanValue.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
       match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
     )
-    const parsed = dayjs(cleanValue, format, true)
-    return parsed.isValid() ? parsed.toISOString() : null
+
+    const parsed = parse(cleanValue, fmt, new Date())
+    return isValid(parsed) ? parsed.toISOString() : null
   }
 
   static normalizeAmount(value: string): number {
@@ -131,5 +133,26 @@ export class CsvHelper {
 
   static normalizePayee(value: string): string {
     return value.trim().toLowerCase()
+  }
+
+  static generateCsv(
+    data: any[],
+    options: {
+      headers?: string[]
+      delimiter?: string
+    } = {}
+  ): string {
+    const unparseConfig: any = {
+      delimiter: options.delimiter || ',',
+      header: true,
+    };
+
+    // Explicitly handle fields if provided
+    if (options.headers) {
+      unparseConfig.columns = options.headers; // functionality for Papa.unparse depends on input format
+    }
+
+    // Papa.unparse(data, config) where data is array of objects
+    return Papa.unparse(data, unparseConfig);
   }
 }

@@ -24,11 +24,12 @@ export default function ActionSheet({
   setConfirmModalVisible,
 }: Props) {
   const { expenseListStyle, globalStyle, schemeColors } = useTheme();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>(); // Cast to any or helper type if specific routes aren't global
+
   const onEdit = () => {
     if (!activeTransaction) return;
     setActionModalVisible(false);
-    (navigation as any).navigate('AddExpense', { id: activeTransaction.id });
+    navigation.navigate('AddExpense', { id: activeTransaction.id });
   };
   const isVoid = activeTransaction?.deleted;
   const onClone = async () => {
@@ -54,7 +55,7 @@ export default function ActionSheet({
     setConfirmModalVisible(true);
   };
   const onRequestClose = () => setActionModalVisible(false);
-  
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
       <TouchableOpacity style={globalStyle.modalOverlay} activeOpacity={1} onPress={onRequestClose}>

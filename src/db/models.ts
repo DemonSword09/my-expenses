@@ -47,7 +47,7 @@ export interface Category {
   label: string;
   parentId?: UUID | null; // hierarchical
   icon?: string | null;
-  color?: number | null;
+  color?: number | string | null;
   // removed createdAt / updatedAt per request
 }
 
@@ -73,6 +73,7 @@ export interface TransactionDetail extends Transaction {
   payee_name?: string | null;
   category_label?: string | null;
   category_parent_label?: string | null;
+  category_parent_id?: string | null;
   category_icon?: string | null;
   category_color?: number | null;
 }

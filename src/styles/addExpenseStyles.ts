@@ -1,7 +1,7 @@
 // src/styles/addExpenseStyles.ts
 import { StyleSheet } from 'react-native';
 import { globalStyles } from './globalStyles';
-import { getThemeColors } from './theme';
+import { getThemeColors, SHADOWS } from './theme';
 
 export const addExpenseStyles = (scheme: any) => {
   const g = globalStyles(scheme);
@@ -18,7 +18,7 @@ export const addExpenseStyles = (scheme: any) => {
 
     label: {
       marginBottom: 6,
-      color: colors.muted,
+      color: colors.textMuted,
     },
 
     // category modal
@@ -31,7 +31,7 @@ export const addExpenseStyles = (scheme: any) => {
     categoryModalTitle: {
       fontWeight: '700',
       fontSize: 16,
-      color: colors.text,
+      color: colors.textStrong,
     },
 
     categoryRow: {
@@ -47,12 +47,12 @@ export const addExpenseStyles = (scheme: any) => {
     },
     categoryRowText: {
       fontSize: 15,
-      color: colors.text,
+      color: colors.textStrong,
     },
 
     categorySeparator: {
       height: 1,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.bgMid,
       marginLeft: 0,
     },
 
@@ -72,7 +72,7 @@ export const addExpenseStyles = (scheme: any) => {
 
     // date button spacing
     dateButton: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.bgMid,
     },
     saveButton: {
       flex: 1,
@@ -82,11 +82,7 @@ export const addExpenseStyles = (scheme: any) => {
     glassBase: {
       borderWidth: 1,
       borderColor: colors.glassBorder,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2, 
-      shadowRadius: 8,
-      elevation: 4,
+      ...SHADOWS.glow, // Use glow for glass elements
     },
 
     // Glass Jelly Toggle Styles
@@ -122,10 +118,10 @@ export const addExpenseStyles = (scheme: any) => {
     glassLabel: {
       fontWeight: '600',
       fontSize: 16,
-      color: colors.muted,
+      color: colors.textMuted,
     },
     glassLabelActive: {
-      color: colors.text,
+      color: colors.textStrong,
       fontWeight: '700',
     },
 
@@ -136,9 +132,10 @@ export const addExpenseStyles = (scheme: any) => {
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
+      ...SHADOWS.glow, // Glow on save
     },
     glassSaveButtonText: {
-      color: colors.text,
+      color: colors.textStrong,
       fontSize: 16,
       fontWeight: '700',
       textShadowColor: colors.glassBorder,

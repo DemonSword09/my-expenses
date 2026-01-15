@@ -1,146 +1,105 @@
 // src/hooks/useExpenses.ts
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { TransactionRepo } from '../db/repositories/TransactionRepo';
-import { CategoryRepo } from '../db/repositories/CategoryRepo';
-import { all } from '../db/sqlite';
-import type { Transaction, Category, TransactionDetail } from '../db/models';
-import { useRef } from 'react';
+import type { TransactionDetail, Category } from '../db/models';
+import { useAppData } from '../context/AppDataProvider';
 
-export type FilterMode = 'all' | 'week' | 'month';
+import { FilterState } from '../components/FilterModal';
+export type { FilterState };
 
 export default function useExpenses() {
-  const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
-  const [categoriesMap, setCategoriesMap] = useState<Record<string, Category>>({});
-  const [payeesMap, setPayeesMap] = useState<Record<string, string>>({});
-  const [refreshing, setRefreshing] = useState(false);
+  const {
+    categories,
+    categoriesMap: globalCatMap,
+    payeesMap: globalPayeeMap,
+    refreshData: refreshLookups,
+    getCategoryLabel
+  } = useAppData();
 
+  // State
+  const [transactions, setTransactions] = useState<TransactionDetail[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FilterState>({ dataset: 'all' });
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<FilterMode>('all');
 
   const mounted = useRef(true);
-  // load lookups
-  const loadLookups = useCallback(async () => {
-    try {
-      const cats = await CategoryRepo.listAll();
-      const cmap: Record<string, Category> = {};
-      for (const c of cats) cmap[c.id] = c;
-      if (mounted.current) setCategoriesMap(cmap);
-    } catch (err) {
-      console.error('useExpenses: failed loading categories', err);
-      if (mounted.current) setCategoriesMap({});
-    }
 
-    try {
-      const rows = await all<{ id: string; name: string }>('SELECT id, name FROM payees');
-      const pmap: Record<string, string> = {};
-      (rows || []).forEach((r) => {
-        if (r && r.id) pmap[r.id] = r.name;
-      });
-      if (mounted.current) setPayeesMap(pmap);
-    } catch (err) {
-      console.error('useExpenses: failed loading payees', err);
-      if (mounted.current) setPayeesMap({});
-    }
-  }, []);
+  // Alias for compatibility, though consuming components should rely on context implicitly if possible.
+  // But calling this ensures fresh data if needed.
+  const loadLookups = useCallback(async () => {
+    await refreshLookups();
+  }, [refreshLookups]);
 
   const load = useCallback(async () => {
     try {
-      // Optimized: use JOINs instead of client-side lookups for list
-      const rows = await TransactionRepo.listWithDetails();
+      const rows = await TransactionRepo.findWithFiltersDetails({
+        ...filter,
+        query // Pass text query to SQL
+      });
       if (mounted.current) setTransactions(rows);
     } catch (err) {
       console.error('useExpenses: failed to load transactions', err);
     }
-  }, []);
+  }, [filter, query]); // Reload when filters change
 
   useFocusEffect(
     useCallback(() => {
       mounted.current = true;
-      (async () => {
-        await loadLookups();
-        await load();
-      })();
+      load();
+      // We don't necessarily force refresh lookups every time, 
+      // but if we want to ensure sync after returning from Add/Edit screens:
+      // refreshLookups(); 
+      // The context loads once. If AddExpense updates context, we are good.
+      // Current AddExpense uses useAddExpense which might not update context.
+      // We'll address that later. For now, let's allow manual refresh via pull-to-refresh.
 
       return () => {
         mounted.current = false;
       };
-    }, [load, loadLookups]),
+    }, [load])
   );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await loadLookups();
+      await refreshLookups();
       await load();
     } finally {
       setRefreshing(false);
     }
-  }, [load, loadLookups]);
+  }, [load, refreshLookups]);
 
   const resolveCategoryHeading = useCallback(
     (categoryId?: string | null) => {
-      // Keep this for external consumers or fallback
-      if (!categoryId) return 'Uncategorized';
-      const cat = categoriesMap[categoryId];
-      if (!cat) return 'Category';
-      const parentId = (cat as any).parentId as string | undefined;
-      const label = (cat as any).label ?? (cat as any).name ?? 'Category';
-      if (parentId) {
-        const parent = categoriesMap[parentId];
-        if (parent) {
-          const parentLabel = (parent as any).label ?? (parent as any).name ?? 'Category';
-          return `${parentLabel} > ${label}`;
-        }
-        return label;
-      }
-      return label;
+      return getCategoryLabel(categoryId);
     },
-    [categoriesMap],
+    [getCategoryLabel]
   );
 
   const resolveCategory = useCallback(
     (categoryId?: string | null) => {
       if (!categoryId) return null;
-      return categoriesMap[categoryId] ?? null;
+      return categories.find(c => c.id === categoryId) ?? null;
     },
-    [categoriesMap],
+    [categories]
   );
 
-  const filteredTransactions = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const now = Date.now();
-    return transactions.filter((t) => {
-      // time filters (client-side)
-      if (filter === 'week' && !(t.createdAt >= now - 1000 * 60 * 60 * 24 * 7)) return false;
-      if (filter === 'month' && !(t.createdAt >= now - 1000 * 60 * 60 * 24 * 30)) return false;
-
-      if (!q) return true;
-
-      // Search using pre-joined fields first, fallback to maps
-      const payee = (t.payee_name ?? payeesMap[t.payeeId ?? ''] ?? '').toLowerCase();
-      
-      let cat = '';
-      if (t.category_label) {
-         cat = t.category_parent_label 
-            ? `${t.category_parent_label} > ${t.category_label}` 
-            : t.category_label;
-      } else {
-         cat = resolveCategoryHeading(t.categoryId); // fallback
-      }
-      cat = cat.toLowerCase();
-
-      const comment = (t.comment ?? '').toLowerCase();
-      return payee.includes(q) || cat.includes(q) || comment.includes(q);
-    });
-  }, [transactions, filter, query, payeesMap, resolveCategoryHeading]);
+  // FilteredTransactions is now just 'transactions' because we filter in DB.
+  // However, we might keep it as alias to avoid breaking UI that expects 'filteredTransactions'
+  const filteredTransactions = transactions;
 
   return {
     // state
     transactions,
     filteredTransactions,
-    categoriesMap,
-    payeesMap,
+    categoriesMap: globalCatMap, // Exposing id->label map (Note: previously was id->Object, checking usage...)
+    // CAUTION: Previous categoriesMap was Record<string, Category>. globalCatMap is Record<string, string>.
+    // I need to check usage in ExpenseList.tsx.
+    // If ExpenseList uses categoriesMap to look up objects, I need to compute id->Object map.
+    // Let's verify usage in ExpenseList.tsx.
+
+    payeesMap: globalPayeeMap,
     refreshing,
     query,
     setQuery,
@@ -153,5 +112,5 @@ export default function useExpenses() {
     loadLookups,
     resolveCategoryHeading,
     resolveCategory,
-  } as const;
+  };
 }

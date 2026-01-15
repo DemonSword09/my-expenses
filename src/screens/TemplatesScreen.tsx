@@ -4,14 +4,48 @@ import { Appbar } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import useTheme from '../hooks/useTheme';
 import useTemplates from '../hooks/useTemplates';
-import TemplateListItem from '../components/TemplateListItem';
-import TemplateEditor from '../components/TemplateEditor';
-import RecurringScheduleModal from '../components/RecurringScheduleModal';
+import TemplateListItem from '../components/Template/TemplateListItem';
+import TemplateEditor from '../components/Template/TemplateEditor';
+import RecurringScheduleModal from '../components/Recurrence/RecurringScheduleModal';
+import ConfirmationModal from '../components/ConfirmationModal';
+import { useAppData } from '../context/AppDataProvider';
 import { parseCronToPreset } from '../utils/cronPresets';
-import { CategoryRepo } from '../db/repositories/CategoryRepo';
+
+/* ... */
+// (Assuming import React part is same, just targeting the function body and styles)
 
 export default function TemplatesScreen({ navigation }: any) {
   const { globalStyle, schemeColors } = useTheme();
+
+  const styles = React.useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: schemeColors.background,
+    },
+    header: {
+      backgroundColor: schemeColors.background,
+      elevation: 0,
+    },
+    headerTitle: {
+      fontWeight: '700',
+      color: schemeColors.text,
+    },
+    listContent: {
+      paddingBottom: 120,
+      paddingTop: 16,
+    },
+    emptyState: {
+      alignItems: 'center',
+      marginTop: 64,
+      paddingHorizontal: 32,
+    },
+    emptyText: {
+      fontSize: 16,
+      textAlign: 'center',
+      color: schemeColors.muted,
+    },
+  }), [schemeColors]);
+
   const {
     templates,
     loading,
@@ -21,37 +55,19 @@ export default function TemplatesScreen({ navigation }: any) {
     deleteTemplate,
     instantiateTemplate,
   } = useTemplates();
+  const { getCategoryLabel } = useAppData();
 
   const [editorVisible, setEditorVisible] = useState(false);
   const [scheduleVisible, setScheduleVisible] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
-  const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
+  // New State for confirmation
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<any | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       load();
-      // Pre-fetch categories to avoid N+1 queries in list items
-      (async () => {
-        try {
-          const cats = await CategoryRepo.listAll();
-          const map: Record<string, string> = {};
-          // First pass: ID -> Label
-          cats.forEach(c => { map[c.id] = c.label; });
-          // Second pass: Handle hierarchy (Parent > Child)
-          const fullMap: Record<string, string> = {};
-          cats.forEach(c => {
-            if (c.parentId && map[c.parentId]) {
-              fullMap[c.id] = `${map[c.parentId]} > ${c.label}`;
-            } else {
-              fullMap[c.id] = c.label;
-            }
-          });
-          setCategoryMap(fullMap);
-        } catch (e) {
-          console.error('Failed to load categories', e);
-        }
-      })();
     }, [load])
   );
 
@@ -101,16 +117,16 @@ export default function TemplatesScreen({ navigation }: any) {
   };
 
   const onDelete = (tpl: any) => {
-    Alert.alert('Delete template', 'Are you sure you want to delete this template?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTemplate(tpl.id);
-        },
-      },
-    ]);
+    setItemToDelete(tpl);
+    setConfirmDeleteVisible(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (itemToDelete) {
+      await deleteTemplate(itemToDelete.id);
+      setItemToDelete(null);
+      setConfirmDeleteVisible(false);
+    }
   };
 
   const onInstantiate = async (tpl: any) => {
@@ -170,13 +186,13 @@ export default function TemplatesScreen({ navigation }: any) {
       let catLabel: string | undefined;
       try {
         const obj = JSON.parse(t.template_json);
-        if (obj.categoryId) catLabel = categoryMap[obj.categoryId];
+        if (obj.categoryId) catLabel = getCategoryLabel(obj.categoryId);
       } catch {
         // ignore
       }
       return { ...t, _catLabel: catLabel };
     });
-  }, [templates, categoryMap]);
+  }, [templates, getCategoryLabel]);
 
   const renderItem = useCallback(({ item }: { item: any }) => (
     <TemplateListItem
@@ -189,12 +205,12 @@ export default function TemplatesScreen({ navigation }: any) {
   ), [onInstantiate, onEdit, onDelete]);
 
   return (
-    <View style={[styles.container, { backgroundColor: schemeColors.background }]}>
-      <Appbar.Header style={{ backgroundColor: schemeColors.background, elevation: 0 }}>
+    <View style={styles.container}>
+      <Appbar.Header style={styles.header}>
         <Appbar.BackAction onPress={() => navigation.goBack()} color={schemeColors.text} />
-        <Appbar.Content title="Templates" titleStyle={{ fontWeight: '700', color: schemeColors.text }} />
+        <Appbar.Content title="Templates" titleStyle={styles.headerTitle} />
         <Appbar.Action icon="calendar-clock" onPress={() => setScheduleVisible(true)} color={schemeColors.text} />
-        <Appbar.Action icon="bug" onPress={() => navigation.navigate('Debug')} color={schemeColors.text} />
+        {/* <Appbar.Action icon="bug" onPress={() => navigation.navigate('Debug')} color={schemeColors.text} /> */}
         <Appbar.Action icon="plus" onPress={onAdd} color={schemeColors.primary} />
       </Appbar.Header>
 
@@ -202,11 +218,11 @@ export default function TemplatesScreen({ navigation }: any) {
         data={viewData}
         keyExtractor={(t) => t.id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 120, paddingTop: 16 }}
+        contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: schemeColors.muted }]}>
+            <Text style={styles.emptyText}>
               No templates yet. Tap + to create one.
             </Text>
           </View>
@@ -224,21 +240,19 @@ export default function TemplatesScreen({ navigation }: any) {
         visible={scheduleVisible}
         onClose={() => setScheduleVisible(false)}
       />
+
+      <ConfirmationModal
+        visible={confirmDeleteVisible}
+        onCancel={() => {
+          setConfirmDeleteVisible(false);
+          setItemToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title="Delete template"
+        message="Are you sure you want to delete this template?"
+        confirmLabel="Delete"
+        isDestructive={true}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  emptyState: {
-    alignItems: 'center',
-    marginTop: 64,
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});

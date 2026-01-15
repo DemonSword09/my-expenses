@@ -2,7 +2,7 @@
   "expo": {
     "name": "my-expenses",
     "slug": "my-expenses",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,8 +16,9 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.harsh.myexpenses",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/splash-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -25,6 +26,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c8b141c8-019b-47d5-bd8f-23556a8699f0"
+      }
     }
   }
 }
