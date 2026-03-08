@@ -10,7 +10,7 @@ interface ExportOptionsModalProps {
 }
 
 const ExportOptionsModal: React.FC<ExportOptionsModalProps> = ({ visible, onDismiss, onConfirm }) => {
-    const { schemeColors, globalStyle } = useTheme();
+    const { schemeColors, actionModalStyle } = useTheme();
     const [delimiter, setDelimiter] = useState<',' | ';' | '\t'>(',');
     const [dateFormat, setDateFormat] = useState('yyyy-MM-dd');
 
@@ -27,7 +27,7 @@ const ExportOptionsModal: React.FC<ExportOptionsModalProps> = ({ visible, onDism
         { label: 'Tab (\\t)', value: '\t' },
     ];
 
-    const styles = getStyles(schemeColors);
+    const styles = actionModalStyle;
 
     return (
         <Modal
@@ -37,7 +37,7 @@ const ExportOptionsModal: React.FC<ExportOptionsModalProps> = ({ visible, onDism
             onRequestClose={onDismiss}
         >
             <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onDismiss}>
-                <View style={styles.container}>
+                <View style={[styles.card, { backgroundColor: schemeColors.surface }]}>
                     <TouchableOpacity activeOpacity={1} style={{ width: '100%' }}>
                         <Text style={styles.title}>Export CSV Options</Text>
 
@@ -92,59 +92,5 @@ const ExportOptionsModal: React.FC<ExportOptionsModalProps> = ({ visible, onDism
         </Modal>
     );
 };
-
-const getStyles = (colors: any) => StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    container: {
-        width: '85%',
-        borderRadius: 16,
-        padding: 20,
-        backgroundColor: colors.surface,
-        elevation: 5,
-        maxWidth: 400,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 16,
-        textAlign: 'center',
-        color: colors.textStrong,
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        marginTop: 4,
-        textTransform: 'uppercase',
-        opacity: 0.8,
-        color: colors.primary,
-    },
-    optionGroup: {
-        marginBottom: 12,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 4,
-    },
-    divider: {
-        marginVertical: 12,
-        backgroundColor: colors.divider,
-    },
-    actions: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        marginTop: 20,
-        gap: 12,
-    },
-    exportBtn: {
-        paddingHorizontal: 16,
-    }
-});
 
 export default ExportOptionsModal;

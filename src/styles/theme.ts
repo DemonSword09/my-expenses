@@ -69,10 +69,41 @@ export const SPACING = {
   block: 48,
 };
 
+export const FONT_SIZE = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  base: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const LINE_HEIGHT = {
+  xs: 14,
+  sm: 16,
+  md: 20,
+  base: 24,
+  lg: 28,
+  xl: 32,
+  xxl: 36,
+  xxxl: 40,
+};
+
+export const FONT_WEIGHT = {
+  regular: '400',
+  medium: '500',
+  semibold: '600',
+  bold: '700',
+} as const;
+
 export const RADIUS = {
   sm: 8,
   md: 12,
   lg: 16,
+  xl: 20,
+  pill: 9999,
 };
 
 // Depth System (Platform compatible)

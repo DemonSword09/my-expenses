@@ -3,7 +3,6 @@ import { View, Text, Modal, StyleSheet, TouchableOpacity, TouchableWithoutFeedba
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useTheme from '../../hooks/useTheme';
-import { SHADOWS, RADIUS, SPACING } from '../../styles/theme';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -24,7 +23,7 @@ interface AnchoredMenuProps<T = any> {
 }
 
 export default function AnchoredMenu({ visible, onDismiss, anchor, menuItems, item, renderItem }: AnchoredMenuProps) {
-    const { schemeColors, scheme } = useTheme();
+    const { schemeColors, scheme, menuStyle } = useTheme();
 
     // Dynamic Menu Positioning
     const menuPosition = useMemo(() => {
@@ -62,6 +61,8 @@ export default function AnchoredMenu({ visible, onDismiss, anchor, menuItems, it
     }, [anchor, menuItems.length, SCREEN_WIDTH]);
 
     if (!visible || !anchor) return null;
+
+    const styles = menuStyle;
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
@@ -101,7 +102,7 @@ export default function AnchoredMenu({ visible, onDismiss, anchor, menuItems, it
 
                 {/* 5. Menu */}
                 <View style={[styles.menuContainer, menuPosition, { backgroundColor: schemeColors.surface }]}>
-                    {menuItems.map((menuItem, index) => (
+                    {menuItems.map((menuItem: any, index: any) => (
                         <TouchableOpacity
                             key={index}
                             style={[
@@ -130,23 +131,3 @@ export default function AnchoredMenu({ visible, onDismiss, anchor, menuItems, it
         </Modal>
     );
 }
-
-const styles = StyleSheet.create({
-    menuContainer: {
-        borderRadius: 14, // More rounded
-        ...SHADOWS.lg,
-        overflow: 'hidden',
-        paddingVertical: 6,
-        zIndex: 21,
-    },
-    menuItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12, // Taller touch target
-    },
-    menuText: {
-        fontSize: 15, // Slightly smaller text for compact look
-        fontWeight: '500',
-    },
-});

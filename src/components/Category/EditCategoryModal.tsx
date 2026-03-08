@@ -1,10 +1,13 @@
 // src/components/EditCategoryModal.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, TextInput, StyleSheet, ScrollView, Platform, KeyboardAvoidingView, Image, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import useTheme from '../../hooks/useTheme';
-// import { BlurView } from 'expo-blur'; // If available, or just use View
-// We don't have expo-blur in package.json, so standard View.
+import ColorPicker, { Panel1, Swatches, Preview, OpacitySlider, HueSlider } from 'reanimated-color-picker';
+import IconPickerModal from './IconPickerModal';
 
 type Props = {
     visible: boolean;
@@ -19,25 +22,14 @@ type Props = {
 
 // Simple color palette
 const COLORS = [
-    '#EF4444', // Red
-    '#F59E0B', // Amber
-    '#10B981', // Emerald
-    '#3B82F6', // Blue
-    '#6366F1', // Indigo
-    '#8B5CF6', // Violet
-    '#EC4899', // Pink
-    '#6B7280', // Gray
+    '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+    '#6366F1', '#8B5CF6', '#EC4899', '#6B7280',
 ];
 
 const ICONS = [
     'folder', 'food', 'car', 'home', 'shopping', 'gift', 'gamepad-variant',
     'school', 'briefcase', 'bank', 'hospital-box', 'airplane'
 ];
-
-import ColorPicker, { Panel1, Swatches, Preview, OpacitySlider, HueSlider } from 'reanimated-color-picker';
-import IconPickerModal from './IconPickerModal';
-
-// ... existing imports
 
 export default function EditCategoryModal({
     visible,
@@ -49,31 +41,86 @@ export default function EditCategoryModal({
     mode,
     parentLabel
 }: Props) {
-    const { schemeColors, globalStyle } = useTheme();
+    const { schemeColors, globalStyle, actionModalStyle } = useTheme();
     const [label, setLabel] = useState(initialLabel);
-    const [selectedIcon, setSelectedIcon] = useState(initialIcon);
+    const [selectedIcon, setSelectedIcon] = useState(() => {
+        if (initialIcon?.startsWith('file://') || initialIcon?.startsWith('http://') || initialIcon?.startsWith('https://')) return 'image';
+        return initialIcon;
+    });
     const [selectedColor, setSelectedColor] = useState(initialColor);
     const [saving, setSaving] = useState(false);
+    const [customImageUri, setCustomImageUri] = useState(() => {
+        if (initialIcon?.startsWith('file://') || initialIcon?.startsWith('http://') || initialIcon?.startsWith('https://')) return initialIcon;
+        return '';
+    });
 
     // Custom Picker State
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [showIconPicker, setShowIconPicker] = useState(false);
 
+    const styles = actionModalStyle; // Action modal styles cover most parts
+
     useEffect(() => {
         if (visible) {
             setLabel(initialLabel);
-            setSelectedIcon(initialIcon);
+            
+            if (initialIcon?.startsWith('file://') || initialIcon?.startsWith('http://') || initialIcon?.startsWith('https://')) {
+                setCustomImageUri(initialIcon);
+                setSelectedIcon('image');
+            } else {
+                setCustomImageUri('');
+                setSelectedIcon(initialIcon);
+            }
             setSelectedColor(initialColor);
             setSaving(false);
             setShowColorPicker(false);
         }
     }, [visible, initialLabel, initialIcon, initialColor]);
 
+    const pickImage = async () => {
+        try {
+            const result = await DocumentPicker.getDocumentAsync({
+                type: 'image/*',
+                copyToCacheDirectory: true,
+            });
+
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                const manipulated = await ImageManipulator.manipulateAsync(
+                    asset.uri,
+                    [{ resize: { width: 256 } }],
+                    { compress: 0.8, format: ImageManipulator.SaveFormat.WEBP }
+                );
+
+                // Just temporarily hold the manipulated URI.
+                // We will copy it to the persistent document directory inside `handleSave` once we know the final label name.
+                setCustomImageUri(manipulated.uri);
+            }
+        } catch (error) {
+            console.error('Error picking image:', error);
+            Alert.alert('Error', 'Failed to pick or process the image.');
+        }
+    };
+
     const handleSave = async () => {
         if (!label.trim()) return;
         setSaving(true);
         try {
-            await onSave(label.trim(), selectedIcon, selectedColor);
+            let finalIcon = customImageUri.trim();
+            
+            // If there's a custom image and it's from the cache (e.g. newly picked), move it to document directory named after the category
+            if (finalIcon && finalIcon.startsWith('file://') && !finalIcon.includes(FileSystem.Paths.document.uri)) {
+                const safeLabel = label.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+                const filename = `cat_${safeLabel}_${Date.now()}.webp`; // keep timestamp to prevent aggressive caching issues when modifying same category
+                const destFile = new FileSystem.File(FileSystem.Paths.document, filename);
+                const sourceFile = new FileSystem.File(finalIcon);
+                sourceFile.copy(destFile);
+                finalIcon = destFile.uri;
+            } else if (!finalIcon) {
+                finalIcon = selectedIcon;
+            }
+
+            await onSave(label.trim(), finalIcon, selectedColor);
             onClose();
         } catch (err) {
             console.error(err);
@@ -83,7 +130,6 @@ export default function EditCategoryModal({
     };
 
     const onSelectColor = ({ hex }: { hex: string }) => {
-        // We don't verify here, just wait for user to close or update live
         setSelectedColor(hex);
     };
 
@@ -150,7 +196,42 @@ export default function EditCategoryModal({
                         </View>
 
                         <View style={styles.section}>
-                            <Text style={[styles.label, { color: schemeColors.muted }]}>ICON</Text>
+                            <Text style={[styles.label, { color: schemeColors.muted }]}>CUSTOM IMAGE (optional)</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 }}>
+                                {customImageUri ? (
+                                    <View style={{ position: 'relative' }}>
+                                        <Image source={{ uri: customImageUri }} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: schemeColors.bgMid }} resizeMode="cover" />
+                                        <TouchableOpacity 
+                                            style={{ position: 'absolute', top: -5, right: -5, backgroundColor: schemeColors.error, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                                            onPress={() => setCustomImageUri('')}
+                                        >
+                                            <MaterialCommunityIcons name="close" size={12} color="#fff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : null}
+                                <TouchableOpacity
+                                    style={[globalStyle.primaryButton, { paddingHorizontal: 16, paddingVertical: 8, flex: 1, backgroundColor: schemeColors.bgMid }]}
+                                    onPress={pickImage}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                        <MaterialCommunityIcons name="upload" size={18} color={schemeColors.text} />
+                                        <Text style={{ color: schemeColors.text, fontWeight: 'bold' }}>Pick Local Image</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                            <TextInput
+                                style={[globalStyle.input, { backgroundColor: schemeColors.bgMid, borderColor: schemeColors.border, fontSize: 13, paddingVertical: 8, marginTop: 4 }]}
+                                value={customImageUri}
+                                onChangeText={setCustomImageUri}
+                                placeholder="Or enter image URL (https://...)"
+                                placeholderTextColor={schemeColors.muted}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+                        </View>
+
+                        <View style={styles.section}>
+                            <Text style={[styles.label, { color: schemeColors.muted }]}>OR SELECT ICON</Text>
                             <View style={styles.rowWrap}>
                                 {/* Ensure selected icon is always visible/first if not in quick list */}
                                 {[
@@ -236,92 +317,3 @@ export default function EditCategoryModal({
         </Modal>
     );
 }
-
-const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    card: {
-        width: '100%',
-        borderRadius: 20,
-        padding: 24,
-        maxWidth: 500,
-        // Shadow
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.30,
-        shadowRadius: 4.65,
-        elevation: 8,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    section: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 12,
-        fontWeight: '700',
-        marginBottom: 8,
-        letterSpacing: 1,
-    },
-    rowWrap: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-    },
-    colorCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-    },
-    selectedRing: {
-        borderWidth: 2,
-        borderColor: '#fff',
-    },
-    iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    footer: {
-        marginTop: 8,
-        flexDirection: 'row',
-    },
-    pickerOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    pickerCard: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 24,
-        paddingBottom: 40,
-        height: '60%',
-    },
-    pickerHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    }
-});

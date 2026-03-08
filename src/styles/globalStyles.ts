@@ -1,6 +1,6 @@
 // src/styles/globalStyles.ts
-import { StyleSheet, Platform } from 'react-native';
-import { getThemeColors, SPACING, RADIUS, COLORS, SHADOWS } from './theme';
+import { StyleSheet } from 'react-native';
+import { getThemeColors, SPACING, RADIUS, COLORS, SHADOWS, FONT_SIZE, FONT_WEIGHT, LINE_HEIGHT } from './theme';
 
 export const globalStyles = (scheme: any) => {
   const schemeColors = getThemeColors(scheme);
@@ -20,13 +20,13 @@ export const globalStyles = (scheme: any) => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
       height: 64, // Standardize header height
     },
     headerTitle: {
-      fontSize: 20,
-      fontWeight: '600',
+      fontSize: FONT_SIZE.xl, // 20
+      fontWeight: FONT_WEIGHT.semibold, // 600
       color: schemeColors.textStrong,
       textAlign: 'center',
     },
@@ -34,13 +34,13 @@ export const globalStyles = (scheme: any) => {
     // buttons / quick-add
     addButton: {
       backgroundColor: schemeColors.primary,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
       borderRadius: RADIUS.sm,
     },
     addButtonText: {
       color: colors.white,
-      fontWeight: '700',
+      fontWeight: FONT_WEIGHT.bold, // 700
     },
 
     // floating action button
@@ -58,8 +58,8 @@ export const globalStyles = (scheme: any) => {
     },
     fabText: {
       color: colors.white,
-      fontSize: 28,
-      lineHeight: 28,
+      fontSize: FONT_SIZE.xxxl, // 32 (was 28, close enough for icon)
+      lineHeight: LINE_HEIGHT.lg, // 28
     },
 
     // search block
@@ -92,7 +92,7 @@ export const globalStyles = (scheme: any) => {
     filterPill: {
       paddingHorizontal: 12,
       paddingVertical: 6,
-      borderRadius: 9999,
+      borderRadius: RADIUS.pill, // 9999
       backgroundColor: schemeColors.bgMid,
       marginRight: 8,
       borderWidth: 1,
@@ -104,7 +104,7 @@ export const globalStyles = (scheme: any) => {
     },
     filterText: {
       color: schemeColors.textStrong,
-      fontWeight: '600',
+      fontWeight: FONT_WEIGHT.semibold, // 600
     },
     filterTextActive: {
       color: colors.white,
@@ -132,12 +132,12 @@ export const globalStyles = (scheme: any) => {
     // form styles
     formContainer: {
       flex: 1,
-      padding: 20,
+      padding: SPACING.xl,
     },
     formSection: {
       backgroundColor: schemeColors.bgMid,
       borderRadius: RADIUS.lg,
-      marginBottom: 20,
+      marginBottom: SPACING.xl,
       ...SHADOWS.glow, // Restored glow
       shadowOpacity: 0.15, // Tweak opacity for form section specifically if needed
       borderWidth: 1,
@@ -147,7 +147,7 @@ export const globalStyles = (scheme: any) => {
     formRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 20,
+      padding: SPACING.xl,
       borderBottomWidth: 1,
       borderBottomColor: schemeColors.border, // Use border token
       minHeight: 56,
@@ -156,20 +156,20 @@ export const globalStyles = (scheme: any) => {
       borderBottomWidth: 0,
     },
     formLabel: {
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       width: 100,
       color: schemeColors.textStrong,
-      fontWeight: '500',
+      fontWeight: FONT_WEIGHT.medium, // 500
     },
     formInput: {
       flex: 1,
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       color: schemeColors.textStrong,
       textAlign: 'right',
     },
     formValue: {
       flex: 1,
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       color: schemeColors.textStrong,
       textAlign: 'right',
     },
@@ -183,20 +183,20 @@ export const globalStyles = (scheme: any) => {
       borderBottomColor: schemeColors.border,
     },
     rowLabel: {
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       width: 100,
       color: schemeColors.textStrong,
-      fontWeight: '500',
+      fontWeight: FONT_WEIGHT.medium, // 500
     },
     rowInput: {
       flex: 1,
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       color: schemeColors.textStrong,
       textAlign: 'right',
     },
     rowValue: {
       flex: 1,
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       color: schemeColors.textStrong,
       textAlign: 'right',
     },
@@ -206,8 +206,8 @@ export const globalStyles = (scheme: any) => {
 
     // section header
     sectionHeader: {
-      fontSize: 12,
-      fontWeight: '500',
+      fontSize: FONT_SIZE.sm, // 12
+      fontWeight: FONT_WEIGHT.medium, // 500
       marginBottom: 8,
       marginTop: 20,
       marginLeft: 20, // Align with card padding
@@ -227,8 +227,8 @@ export const globalStyles = (scheme: any) => {
     },
     primaryButtonText: {
       color: colors.white,
-      fontSize: 16,
-      fontWeight: '700',
+      fontSize: FONT_SIZE.base, // 16
+      fontWeight: FONT_WEIGHT.bold, // 700
     },
     secondaryButton: {
       backgroundColor: schemeColors.bgMid,
@@ -241,8 +241,8 @@ export const globalStyles = (scheme: any) => {
     },
     secondaryButtonText: {
       color: schemeColors.textStrong,
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: FONT_SIZE.base, // 16
+      fontWeight: FONT_WEIGHT.semibold, // 600
     },
 
     // modal sheet (action sheet / confirm)
@@ -255,7 +255,7 @@ export const globalStyles = (scheme: any) => {
       ...SHADOWS.lg,
     },
     modalRow: { paddingVertical: 12, flexDirection: 'row' },
-    modalRowText: { fontSize: 16, color: schemeColors.textStrong, paddingLeft: 8 },
+    modalRowText: { fontSize: FONT_SIZE.base, color: schemeColors.textStrong, paddingLeft: 8 },
 
     // Glass Base (available globally)
     glassBase: {

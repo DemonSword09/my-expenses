@@ -1,7 +1,7 @@
 // src/styles/expenseListStyles.ts
 import { StyleSheet } from 'react-native';
 import { globalStyles } from './globalStyles';
-import { COLORS, getThemeColors, SPACING, RADIUS, SHADOWS } from './theme';
+import { COLORS, getThemeColors, SPACING, RADIUS, SHADOWS, FONT_SIZE, FONT_WEIGHT } from './theme';
 
 export const expenseListStyles = (scheme: any) => {
   const g = globalStyles(scheme);
@@ -28,12 +28,28 @@ export const expenseListStyles = (scheme: any) => {
     },
 
     itemBody: { flex: 1, paddingRight: SPACING.sm },
-    itemTitle: { fontSize: 15, fontWeight: '700', marginBottom: SPACING.xxs, color: schemeColors.textStrong },
-    itemSubtitle: { fontSize: 13, color: schemeColors.textMuted },
+    itemTitle: {
+      fontSize: FONT_SIZE.base, // 16 (was 15)
+      fontWeight: FONT_WEIGHT.bold, // 700 
+      marginBottom: SPACING.xxs,
+      color: schemeColors.textStrong
+    },
+    itemSubtitle: {
+      fontSize: FONT_SIZE.sm, // 12 (was 13) 
+      color: schemeColors.textMuted
+    },
 
     itemRight: { alignItems: 'flex-end', marginRight: SPACING.md },
-    itemDate: { fontSize: 13, color: schemeColors.textMuted, marginBottom: SPACING.xs },
-    itemAmount: { fontSize: 16, fontWeight: '600', color: schemeColors.textStrong },
+    itemDate: {
+      fontSize: FONT_SIZE.sm, // 12 (was 13)
+      color: schemeColors.textMuted,
+      marginBottom: SPACING.xs
+    },
+    itemAmount: {
+      fontSize: FONT_SIZE.base, // 16 
+      fontWeight: FONT_WEIGHT.semibold, // 600
+      color: schemeColors.textStrong
+    },
 
     categoryRight: { width: 36, alignItems: 'center', marginRight: SPACING.sm, justifyContent: 'center' },
     catFallback: {
@@ -44,7 +60,10 @@ export const expenseListStyles = (scheme: any) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    catFallbackText: { fontWeight: '700', color: schemeColors.textStrong },
+    catFallbackText: {
+      fontWeight: FONT_WEIGHT.bold, // 700
+      color: schemeColors.textStrong
+    },
 
     deletedLine: g.deletedLine,
 
@@ -71,7 +90,7 @@ export const expenseListStyles = (scheme: any) => {
       paddingHorizontal: SPACING.lg,
     },
     menuText: {
-      fontSize: 16,
+      fontSize: FONT_SIZE.base, // 16
       color: schemeColors.textStrong,
     },
 
@@ -80,16 +99,16 @@ export const expenseListStyles = (scheme: any) => {
       backgroundColor: schemeColors.bgDark,
     },
     headerTitleSelected: {
-      fontWeight: 'bold',
+      fontWeight: FONT_WEIGHT.bold,
       color: schemeColors.textStrong,
     },
     headerTitleText: {
-      fontWeight: 'bold',
-      fontSize: 18,
+      fontWeight: FONT_WEIGHT.bold,
+      fontSize: FONT_SIZE.lg, // 18
       color: schemeColors.textStrong,
     },
     headerBalanceText: {
-      fontSize: 14,
+      fontSize: FONT_SIZE.md, // 14
       color: schemeColors.textStrong,
     },
     menuDivider: {

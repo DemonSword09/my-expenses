@@ -7,7 +7,7 @@ export const CATEGORY_SEED = [
     subcategories: [
       { name: 'Tea', icon: 'cup', color: '#A1887F' },
       { name: 'Canteen', icon: 'silverware-fork-knife', color: '#8D6E63' },
-      { name: 'Street', icon: 'food', color: '#FF8A65' },
+      { name: 'Street', icon: 'food-truck', color: '#FF8A65' },
       { name: 'Drinks', icon: 'glass-cocktail', color: '#FFB74D' },
       { name: 'Grocery', icon: 'cart', color: '#66BB6A' },
       { name: 'Restaurant', icon: 'silverware-clean', color: '#E64A19' },
@@ -145,7 +145,7 @@ export const CATEGORY_SEED = [
     color: '#26C6DA',
     type: 'expense',
     subcategories: [
-      { name: 'Travels', icon: 'airplane', color: '#29B6F6' },
+      { name: 'Tours', icon: 'airplane', color: '#29B6F6' },
       { name: 'Housing', icon: 'home', color: '#8D6E63' },
       { name: 'Visits', icon: 'camera', color: '#AB47BC' },
     ],
@@ -238,7 +238,7 @@ export const CATEGORY_SEED = [
       { name: 'Food', icon: 'bone', color: '#FF7043' },
       { name: 'Grooming', icon: 'shower', color: '#26C6DA' },
       { name: 'Various supplies', icon: 'basket', color: '#A1887F' },
-      { name: 'Veterinary surgeon', icon: 'hospital', color: '#E53935' },
+      { name: 'Veterinary', icon: 'hospital', color: '#E53935' },
     ],
   },
 

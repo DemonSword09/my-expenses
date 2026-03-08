@@ -1,8 +1,8 @@
-import { useDebugLogic } from '../hooks/useDebugLogic';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, Text, View, Button } from 'react-native';
+
+import { useDebugLogic } from '../hooks/useDebugLogic';
 import useTheme from '../hooks/useTheme';
-import { useState, useEffect } from 'react';
-import { ScrollView, Text, View, Button, StyleSheet } from 'react-native';
 
 export default function DebugScreen() {
   const { schemeColors, globalStyle } = useTheme();
@@ -13,50 +13,64 @@ export default function DebugScreen() {
     loadData,
     deleteRule,
     handleRecalculate,
-    recalculateRuleNextDate
+    recalculateRuleNextDate,
   } = useDebugLogic();
 
   return (
     <SafeAreaView style={globalStyle.container}>
       <ScrollView>
-        <Text style={[styles.header, { color: schemeColors.text }]}>Debug Screen</Text>
+        <Text style={globalStyle.headerTitle}>Debug Screen</Text>
         <Button title="Refresh" onPress={loadData} />
-        <View style={{ height: 10 }} />
+        <View style={globalStyle.sectionHeader} />
         <Button title="Recalculate Recurring" onPress={handleRecalculate} />
 
-        <Text style={[styles.section, { color: schemeColors.text }]}>Recurring Rules ({rules.length})</Text>
-        {rules.map((r) => (
-          <View key={r.id} style={{ backgroundColor: schemeColors.surface, padding: 10, marginBottom: 10, borderRadius: 5 }}>
-            <Text style={{ color: schemeColors.text }}>ID: {r.id}</Text>
-            <Text style={{ color: schemeColors.text }}>Cron: {r.cron_expression}</Text>
-            <Text style={{ color: schemeColors.text }}>Template: {r.template_json}</Text>
-            <Text style={{ color: schemeColors.text }}>Next: {new Date(r.next_date).toISOString()}</Text>
-            <View style={styles.buttonRow}>
-              <Button title="Recalculate Next" onPress={() => recalculateRuleNextDate(r)} />
-              <Button title="Delete" color="red" onPress={() => deleteRule(r.id)} />
+        <Text style={globalStyle.sectionHeader}>
+          Recurring Rules ({rules.length})
+        </Text>
+        {rules.map((rule) => (
+          <View key={rule.id} style={globalStyle.formSection}>
+            <Text style={{ color: schemeColors.text }}>ID: {rule.id}</Text>
+            <Text style={{ color: schemeColors.text }}>
+              Cron: {rule.cron_expression}
+            </Text>
+            <Text style={{ color: schemeColors.text }}>
+              Template: {rule.template_json}
+            </Text>
+            <Text style={{ color: schemeColors.text }}>
+              Next: {new Date(rule.next_date).toISOString()}
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+              <Button
+                title="Recalculate Next"
+                onPress={() => recalculateRuleNextDate(rule)}
+              />
+              <Button
+                title="Delete"
+                color={schemeColors.danger}
+                onPress={() => deleteRule(rule.id)}
+              />
             </View>
           </View>
         ))}
 
-        <Text style={styles.section}>Uncategorized Transactions ({uncategorized.length})</Text>
-        {uncategorized.map((t) => (
-          <View key={t.id} style={{ backgroundColor: schemeColors.surface, padding: 10, marginBottom: 10, borderRadius: 5 }}>
-            <Text style={{ color: schemeColors.text }}>ID: {t.id}</Text>
-            <Text style={{ color: schemeColors.text }}>Amount: {t.amount}</Text>
-            <Text style={{ color: schemeColors.text }}>Desc: {t.comment}</Text>
-            <Text style={{ color: schemeColors.text }}>Date: {new Date(t.createdAt).toISOString()}</Text>
+        <Text style={globalStyle.sectionHeader}>
+          Uncategorized Transactions ({uncategorized.length})
+        </Text>
+        {uncategorized.map((transaction) => (
+          <View key={transaction.id} style={globalStyle.formSection}>
+            <Text style={{ color: schemeColors.text }}>ID: {transaction.id}</Text>
+            <Text style={{ color: schemeColors.text }}>
+              Amount: {transaction.amount}
+            </Text>
+            <Text style={{ color: schemeColors.text }}>
+              Desc: {transaction.comment}
+            </Text>
+            <Text style={{ color: schemeColors.text }}>
+              Date: {new Date(transaction.createdAt).toISOString()}
+            </Text>
           </View>
         ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: { fontSize: 24, fontWeight: 'bold', marginBottom: 10 },
-  section: { fontSize: 18, fontWeight: 'bold', marginTop: 20, marginBottom: 10 },
-  // card style usually needs colors, so we might need to inline it or keep it here if we pass colors?
-  // Actually easier to just use inline styles for dynamic colors or just rely on globalStyle if possible.
-  // Let's keep structure but remove color references here and move them to inline/scheme usage.
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
-});

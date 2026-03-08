@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CategoryRepo } from '../db/repositories/CategoryRepo';
-import { all } from '../db/sqlite';
+import { PayeeRepo } from '../db/repositories/PayeeRepo';
 import type { Category, Payee } from '../db/models';
 
 interface AppDataContextType {
@@ -59,12 +59,9 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setCategoriesMap(cMap);
 
-            // Load Payees (Direct SQL as Repo method returns Payee object but no listAll)
-            // TransactionRepo has 'addPayee' but no 'listPayees'. We can add it or just raw query here.
-            // Raw query for now to avoid modifying Repo signature if not strictly needed yet, 
-            // but modifying Repo is cleaner. Let's do raw query as it's simple.
-            const payeeRows = await all<{ id: string; name: string }>('SELECT * FROM payees ORDER BY name ASC');
-            setPayees(payeeRows as Payee[]);
+            // Load Payees via Repo
+            const payeeRows = await PayeeRepo.listAll();
+            setPayees(payeeRows);
 
             const pMap: Record<string, string> = {};
             payeeRows.forEach((p) => {

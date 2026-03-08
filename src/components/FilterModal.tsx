@@ -36,16 +36,12 @@ export default function FilterModal({
     selectedCategoryLabel,
     selectedPayeeName
 }: Props) {
-    const { schemeColors, globalStyle } = useTheme();
+    const { schemeColors, globalStyle, actionModalStyle } = useTheme();
 
     // Local State
     const [dataset, setDataset] = useState<'all' | 'week' | 'month' | 'custom'>('all');
     const [startDate, setStartDate] = useState<Date>(new Date());
     const [endDate, setEndDate] = useState<Date>(new Date());
-
-    // We don't store cat/payee object here, just the ID implicitly via parent props or local cache? 
-    // Actually, getting 2-way binding for Pickers inside a modal is tricky if Pickers are also Modals.
-    // Solution: Parent passes active selection needed for UI.
 
     // Sync state on open
     useEffect(() => {
@@ -74,10 +70,6 @@ export default function FilterModal({
     const handleApply = () => {
         const result: FilterState = {
             dataset,
-            // Keep existing cat/payee from parent, or managed here?
-            // currentFilters passed in, we should preserve them IF we didn't clear them.
-            // But this modal doesn't have "Clear Category" buttons yet. 
-            // Let's assume parent manages IDs.
             categoryId: currentFilters.categoryId,
             payeeId: currentFilters.payeeId,
         };
@@ -95,7 +87,7 @@ export default function FilterModal({
         onApply({ dataset: 'all', categoryId: undefined, payeeId: undefined });
     };
 
-    const styles = getStyles(schemeColors);
+    const styles = actionModalStyle;
 
     return (
         <Modal
@@ -104,8 +96,8 @@ export default function FilterModal({
             transparent
             onRequestClose={onDismiss}
         >
-            <TouchableOpacity style={globalStyle.modalOverlay} activeOpacity={1} onPress={onDismiss}>
-                <View style={[globalStyle.modalSheet, styles.container]}>
+            <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onDismiss}>
+                <View style={[styles.modalContainer, styles.card, { backgroundColor: schemeColors.surface }]}>
                     <View style={styles.header}>
                         <Text style={styles.title}>Filters</Text>
                         <TouchableOpacity onPress={handleClear}>
@@ -211,93 +203,3 @@ export default function FilterModal({
         </Modal>
     );
 }
-
-const getStyles = (colors: any) => StyleSheet.create({
-    container: {
-        maxHeight: '80%',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: colors.textStrong,
-    },
-    content: {
-        paddingBottom: 20
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        color: colors.textMuted,
-        textTransform: 'uppercase',
-        marginBottom: SPACING.md,
-        marginTop: SPACING.sm
-    },
-    chipRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-        marginBottom: SPACING.md,
-    },
-    chip: {
-        backgroundColor: colors.surface,
-        borderColor: colors.divider,
-    },
-    dateRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: SPACING.md,
-    },
-    dateBtn: {
-        backgroundColor: colors.background,
-        padding: SPACING.sm,
-        borderRadius: RADIUS.sm,
-        width: '45%'
-    },
-    label: {
-        fontSize: 12,
-        color: colors.textMuted,
-        marginBottom: 4
-    },
-    dateText: {
-        fontSize: 16,
-        color: colors.text,
-        fontWeight: '500'
-    },
-    divider: {
-        marginVertical: SPACING.lg,
-        backgroundColor: colors.divider
-    },
-    selectorRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.glassBorder
-    },
-    selectorLabel: {
-        fontSize: 16,
-        color: colors.text,
-        marginLeft: 10
-    },
-    valuePlaceholder: {
-        fontSize: 16,
-        color: colors.textMuted,
-        marginRight: 8
-    },
-    valueActive: {
-        fontSize: 16,
-        color: colors.primary,
-        fontWeight: '600',
-        marginRight: 8
-    },
-    applyBtn: {
-        marginTop: SPACING.md
-    }
-});

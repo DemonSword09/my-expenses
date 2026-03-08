@@ -1,13 +1,10 @@
 import React, { useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Animated, Easing, Dimensions } from 'react-native'
+import { View, Text, Animated, Easing, Dimensions } from 'react-native'
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
+import useTheme from '../hooks/useTheme'
 
-const { width, height } = Dimensions.get('window')
+const { height } = Dimensions.get('window')
 
-/**
- * Wave path data (simple sine-like curve)
- * We scale this horizontally.
- */
 /**
  * Wave path data (seamless sine curve, 2 cycles)
  * 0-300 is one cycle, 300-600 is second cycle.
@@ -21,6 +18,8 @@ interface Props {
 }
 
 export default function WaveLoading({ progress, message = 'Importing...' }: Props) {
+    const { loadingStyle } = useTheme();
+
     // Animation of the wave moving horizontally
     const translateX1 = useRef(new Animated.Value(0)).current
     const fillHeight = useRef(new Animated.Value(0)).current
@@ -60,12 +59,12 @@ export default function WaveLoading({ progress, message = 'Importing...' }: Prop
     })
 
     return (
-        <View style={styles.container}>
-            <View style={styles.background} />
+        <View style={loadingStyle.container}>
+            <View style={loadingStyle.background} />
 
             <Animated.View
                 style={[
-                    styles.waveContainer,
+                    loadingStyle.waveContainer,
                     { transform: [{ translateY: waterLevel }] },
                 ]}
             >
@@ -90,54 +89,13 @@ export default function WaveLoading({ progress, message = 'Importing...' }: Prop
                 </Animated.View>
 
                 {/* Solid Water Block */}
-                <View style={styles.solidWater} />
+                <View style={loadingStyle.solidWater} />
             </Animated.View>
 
-            <View style={styles.textContainer}>
-                <Text style={styles.percentage}>{(Math.min(progress, 1) * 100).toFixed(0)}%</Text>
-                <Text style={styles.message}>{message}</Text>
+            <View style={loadingStyle.textContainer}>
+                <Text style={loadingStyle.percentage}>{(Math.min(progress, 1) * 100).toFixed(0)}%</Text>
+                <Text style={loadingStyle.message}>{message}</Text>
             </View>
         </View>
     )
 }
-
-const styles = StyleSheet.create({
-    container: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'transparent', // or transparent
-        zIndex: 9999,
-        overflow: 'hidden',
-    },
-    background: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: '#f0f0f0',
-    },
-    waveContainer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0, // We animate translateY to push this entire block down
-        height: height + 150, // Screen height + wave height buffer
-    },
-    solidWater: {
-        height: height, // Enough to fill screen
-        backgroundColor: '#00f2fe',
-    },
-    textContainer: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    percentage: {
-        fontSize: 48,
-        fontWeight: '900',
-        color: '#005f7f',
-        opacity: 0.8,
-    },
-    message: {
-        marginTop: 8,
-        fontSize: 18,
-        color: '#005f7f',
-        fontWeight: '600',
-    },
-})

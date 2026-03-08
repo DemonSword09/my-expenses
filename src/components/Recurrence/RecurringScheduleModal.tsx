@@ -24,7 +24,7 @@ interface ScheduleItem {
 }
 
 export default function RecurringScheduleModal({ visible, onClose }: RecurringScheduleModalProps) {
-  const { schemeColors } = useTheme();
+  const { schemeColors, recurrenceStyle } = useTheme();
   const { getRecurringSchedule } = useTemplates();
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -121,22 +121,22 @@ export default function RecurringScheduleModal({ visible, onClose }: RecurringSc
   };
 
   const renderItem = React.useCallback(({ item }: { item: ScheduleItem }) => {
-    return <ScheduleItemRow item={item} onPress={handleItemPress} schemeColors={schemeColors} />;
-  }, [handleItemPress, schemeColors]);
+    return <ScheduleItemRow item={item} onPress={handleItemPress} schemeColors={schemeColors} recurrenceStyle={recurrenceStyle} />;
+  }, [handleItemPress, schemeColors, recurrenceStyle]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: schemeColors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: schemeColors.text }]}>Recurring Schedule</Text>
+      <View style={[recurrenceStyle.container, { backgroundColor: schemeColors.background }]}>
+        <View style={recurrenceStyle.header}>
+          <Text style={[recurrenceStyle.title, { color: schemeColors.text }]}>Recurring Schedule</Text>
           <IconButton icon="close" onPress={onClose} iconColor={schemeColors.text} />
         </View>
-        <Text style={[styles.subtitle, { color: schemeColors.muted }]}>
+        <Text style={[recurrenceStyle.subtitle, { color: schemeColors.muted }]}>
           Last 7 days and future 7 days. Tap item for actions.
         </Text>
 
         {loading ? (
-          <View style={styles.listContent}>
+          <View style={recurrenceStyle.listContent}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((i) => (
               <SkeletonItem key={i} schemeColors={schemeColors} />
             ))}
@@ -146,12 +146,12 @@ export default function RecurringScheduleModal({ visible, onClose }: RecurringSc
             data={schedule}
             keyExtractor={(item, index) => `${item.templateId}_${item.date.getTime()}_${index}`}
             renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={recurrenceStyle.listContent}
             initialNumToRender={10}
             maxToRenderPerBatch={10}
             windowSize={5}
             ListEmptyComponent={
-              <View style={styles.center}>
+              <View style={recurrenceStyle.center}>
                 <Text style={{ color: schemeColors.muted }}>No recurring transactions in range.</Text>
               </View>
             }
@@ -162,26 +162,26 @@ export default function RecurringScheduleModal({ visible, onClose }: RecurringSc
         {selectedItem && (
           <Modal visible={actionModalVisible} transparent animationType="fade" onRequestClose={() => setActionModalVisible(false)}>
             <TouchableOpacity
-              style={styles.modalOverlay}
+              style={recurrenceStyle.modalOverlay}
               activeOpacity={1}
               onPress={() => setActionModalVisible(false)}
             >
-              <View style={[styles.actionSheet, { backgroundColor: schemeColors.surface }]}>
-                <Text style={[styles.actionTitle, { color: schemeColors.text }]}>
+              <View style={[recurrenceStyle.actionSheet, { backgroundColor: schemeColors.surface }]}>
+                <Text style={[recurrenceStyle.actionTitle, { color: schemeColors.text }]}>
                   {selectedItem.templateName} ({format(selectedItem.date, 'MMM dd')})
                 </Text>
 
                 {selectedItem.status === 'executed' ? (
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleAction('reset')}>
+                  <TouchableOpacity style={recurrenceStyle.actionBtn} onPress={() => handleAction('reset')}>
                     <Text style={{ color: schemeColors.danger, fontSize: 17 }}>Reset (Delete)</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleAction('apply_save')}>
+                  <TouchableOpacity style={recurrenceStyle.actionBtn} onPress={() => handleAction('apply_save')}>
                     <Text style={{ color: schemeColors.primary, fontSize: 17, fontWeight: '600' }}>Apply and Save</Text>
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => setActionModalVisible(false)}>
+                <TouchableOpacity style={[recurrenceStyle.actionBtn, { borderBottomWidth: 0 }]} onPress={() => setActionModalVisible(false)}>
                   <Text style={{ color: schemeColors.text, fontSize: 17 }}>Cancel</Text>
                 </TouchableOpacity>
               </View>
@@ -193,7 +193,7 @@ export default function RecurringScheduleModal({ visible, onClose }: RecurringSc
   );
 }
 
-const ScheduleItemRow = React.memo(({ item, onPress, schemeColors }: { item: ScheduleItem, onPress: (i: ScheduleItem) => void, schemeColors: any }) => {
+const ScheduleItemRow = React.memo(({ item, onPress, schemeColors, recurrenceStyle }: { item: ScheduleItem, onPress: (i: ScheduleItem) => void, schemeColors: any, recurrenceStyle: any }) => {
   let icon = 'dots-horizontal';
   let iconColor = schemeColors.muted;
 
@@ -210,115 +210,28 @@ const ScheduleItemRow = React.memo(({ item, onPress, schemeColors }: { item: Sch
 
   return (
     <TouchableOpacity
-      style={[styles.itemRow, { borderBottomColor: schemeColors.border }]}
+      style={[recurrenceStyle.itemRow, { borderBottomColor: schemeColors.border }]}
       onPress={() => onPress(item)}
     >
-      <View style={styles.dateCol}>
-        <Text style={[styles.dateText, { color: schemeColors.text }]}>
+      <View style={recurrenceStyle.dateCol}>
+        <Text style={[recurrenceStyle.dateText, { color: schemeColors.text }]}>
           {format(item.date, 'MMM dd')}
         </Text>
-        <Text style={[styles.weekdayText, { color: schemeColors.muted }]}>
+        <Text style={[recurrenceStyle.weekdayText, { color: schemeColors.muted }]}>
           {format(item.date, 'EEE')}
         </Text>
       </View>
-      <View style={styles.detailsCol}>
-        <Text style={[styles.tplName, { color: schemeColors.text }]} numberOfLines={1}>
+      <View style={recurrenceStyle.detailsCol}>
+        <Text style={[recurrenceStyle.tplName, { color: schemeColors.text }]} numberOfLines={1}>
           {item.templateName}
         </Text>
-        <Text style={[styles.amount, { color: schemeColors.text }]}>
+        <Text style={[recurrenceStyle.amount, { color: schemeColors.text }]}>
           {item.amount.toFixed(2)}
         </Text>
       </View>
-      <View style={styles.statusCol}>
+      <View style={recurrenceStyle.statusCol}>
         <IconButton icon={icon} iconColor={iconColor} size={20} onPress={() => onPress(item)} />
       </View>
     </TouchableOpacity>
   );
-});
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  subtitle: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    fontSize: 14,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContent: {
-    paddingBottom: 32,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    alignItems: 'center',
-  },
-  dateCol: {
-    width: 60,
-    alignItems: 'center',
-  },
-  dateText: {
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  weekdayText: {
-    fontSize: 12,
-  },
-  detailsCol: {
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  tplName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  amount: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  statusCol: {
-    width: 40,
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  actionSheet: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    paddingBottom: 32,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  actionBtn: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-  },
 });

@@ -121,59 +121,6 @@ const ExpenseFormFields = ({
   const [suggestions, setSuggestions] = useState<Payee[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const styles = useMemo(() => StyleSheet.create({
-    suggestionsContainer: {
-      backgroundColor: schemeColors.surface,
-      opacity: 1,
-      borderWidth: 1,
-      borderColor: schemeColors.border,
-      borderRadius: 12,
-      marginTop: 4,
-      maxHeight: 150,
-      position: 'absolute',
-      top: 40,
-      right: 0,
-      minWidth: 150,
-      zIndex: 1000,
-    },
-    suggestionItem: {
-      padding: 12,
-      borderBottomWidth: 0.5,
-      borderBottomColor: schemeColors.border,
-    },
-    suggestionText: {
-      color: schemeColors.text,
-    },
-    errorTooltip: {
-      position: 'absolute',
-      bottom: -20,
-      right: 12,
-      backgroundColor: schemeColors.danger,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 4,
-    },
-    errorText: {
-      color: '#fff',
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    rowContainer: {
-      justifyContent: 'center',
-      paddingVertical: 12,
-    },
-    dateValue: {
-      flex: 1,
-      alignItems: 'flex-end',
-    },
-    categoryButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-    },
-  }), [schemeColors]);
-
   const onMerchantChange = (text: string) => {
     setMerchant(text);
     if (text.length > 0 && payees.length > 0) {
@@ -196,17 +143,17 @@ const ExpenseFormFields = ({
   const renderSuggestions = () => {
     if (!showSuggestions || suggestions.length === 0) return null;
     return (
-      <View style={styles.suggestionsContainer}>
+      <View style={addExpenseStyle.suggestionsContainer}>
         {suggestions.map((p, index) => (
           <TouchableOpacity
             key={p.id}
             onPress={() => onSuggestionPress(p)}
             style={[
-              styles.suggestionItem,
+              addExpenseStyle.suggestionItem,
               index === suggestions.length - 1 && { borderBottomWidth: 0 }
             ]}
           >
-            <Text style={styles.suggestionText}>{p.name}</Text>
+            <Text style={addExpenseStyle.suggestionText}>{p.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -217,7 +164,7 @@ const ExpenseFormFields = ({
     return (
       <>
         {setTransactionType && (
-          <View style={[globalStyle.row, styles.rowContainer]}>
+          <View style={[globalStyle.row, addExpenseStyle.rowContainer]}>
             <GlassToggle
               transactionType={transactionType}
               setTransactionType={setTransactionType}
@@ -239,15 +186,15 @@ const ExpenseFormFields = ({
             style={[globalStyle.rowInput, { textAlign: 'right' }]}
           />
           {errors.amount && (
-            <View style={styles.errorTooltip}>
-              <Text style={styles.errorText}>{errors.amount}</Text>
+            <View style={addExpenseStyle.errorTooltip}>
+              <Text style={addExpenseStyle.errorText}>{errors.amount}</Text>
             </View>
           )}
         </View>
 
         <TouchableOpacity onPress={openDatePicker} style={[globalStyle.row, { paddingVertical: 16 }]}>
           <Text style={globalStyle.rowLabel}>Date</Text>
-          <View style={styles.dateValue}>
+          <View style={addExpenseStyle.dateValue}>
             <Text style={globalStyle.rowValue}>{format(new Date(dateMs), 'PP')}</Text>
           </View>
         </TouchableOpacity>
@@ -272,7 +219,7 @@ const ExpenseFormFields = ({
 
         <View style={[globalStyle.row, { zIndex: 1000 }]}>
           <Text style={globalStyle.rowLabel}>Category</Text>
-          <TouchableOpacity onPress={openCategoryPicker} style={styles.categoryButton}>
+          <TouchableOpacity onPress={openCategoryPicker} style={addExpenseStyle.categoryButton}>
             {selectedCategory?.icon && (
               <MaterialCommunityIcons
                 name={selectedCategory.icon as any}
@@ -327,8 +274,8 @@ const ExpenseFormFields = ({
           style={[globalStyle.searchInput, { marginBottom: 12 }]}
         />
         {errors.amount && (
-          <View style={[styles.errorTooltip, { bottom: -8, right: 0, zIndex: 10 }]}>
-            <Text style={styles.errorText}>{errors.amount}</Text>
+          <View style={[addExpenseStyle.errorTooltip, { bottom: -8, right: 0, zIndex: 10 }]}>
+            <Text style={addExpenseStyle.errorText}>{errors.amount}</Text>
           </View>
         )}
       </View>

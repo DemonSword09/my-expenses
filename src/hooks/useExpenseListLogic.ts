@@ -190,7 +190,8 @@ export function useExpenseListLogic() {
     const totalBalance = useMemo(() => {
         let bal = 0;
         filteredTransactions.forEach((t) => {
-            if (t.transaction_type === 'EXPENSE') bal -= t.amount;
+            const type = (t.transaction_type || 'EXPENSE').toUpperCase();
+            if (type === 'EXPENSE') bal -= t.amount;
             else bal += t.amount;
         });
         return bal;

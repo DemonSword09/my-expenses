@@ -1,10 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { TransactionDetail } from '../../db/models';
 import { format } from 'date-fns';
 import useTheme from '../../hooks/useTheme';
-import { formatColorValue } from '../../utils/colors';
+import { CategoryIcon } from '../Category/CategoryIcon';
+// import { AssetImages } from '../../utils/assetImages';
 
 export interface ExpenseListItemProps {
   item: TransactionDetail;
@@ -43,6 +44,16 @@ const ExpenseListItem = React.memo(({
   const isIncome = (item.transaction_type ?? '').toUpperCase() === 'INCOME';
   const amountSign = isIncome ? '+' : '-';
   const amountColor = isIncome ? schemeColors.success : schemeColors.danger;
+
+  // Select a random image
+  // We use useMemo with an empty dependency array (or item.id if available/stable)
+  // to ensure the image doesn't change on every re-render unless the component is remounted.
+  // Ideally, this should be deterministic based on the item ID or category ID so it's consistent.
+  // However, the request was "random", so we'll stick to random initialization per mount.
+  // const randomImage = useMemo(() => {
+  //   const randomIndex = Math.floor(Math.random() * AssetImages.length);
+  //   return AssetImages[randomIndex];
+  // }, []);
 
   const handlePress = () => {
     if (onPress && itemRef.current) {
@@ -90,19 +101,13 @@ const ExpenseListItem = React.memo(({
         )}
 
         <View style={expenseListStyle.categoryRight}>
-          {item.category_icon ? (
-            <MaterialCommunityIcons
-              name={item.category_icon as any}
-              size={24}
-              color={formatColorValue(item.category_color, schemeColors.primary)}
-            />
-          ) : (
-            <View style={expenseListStyle.catFallback}>
-              <Text style={expenseListStyle.catFallbackText}>
-                {heading ? heading.charAt(0).toUpperCase() : 'C'}
-              </Text>
-            </View>
-          )}
+          <CategoryIcon
+            categoryLabel={categoryLabel}
+            parentLabel={parentLabel}
+            categoryIcon={item.category_icon}
+            size={34}
+            color={schemeColors.primary}
+          />
         </View>
 
         <View style={expenseListStyle.itemBody}>

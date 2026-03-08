@@ -1,13 +1,16 @@
 // src/hooks/useChatAgent.ts
 import { useState, useCallback } from 'react';
-import { ChatService, ChatMessage } from '../services/ChatService';
+import { ChatService, ChatMessage, ResponseFormat } from '../services/ChatService';
 import { uuidSync } from '../utils/uuid';
 
 export function useChatAgent() {
+    const welcomeResponse = ChatService.getWelcomeMessage();
+
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: '1',
-            text: "Hi! I'm your Expense Agent. You can ask me to 'list all categories', 'show top expenses', or add a transaction like 'Lunch for 20'.",
+            text: welcomeResponse.text,
+            format: welcomeResponse.format,
             sender: 'bot',
             timestamp: Date.now(),
         },
@@ -20,6 +23,7 @@ export function useChatAgent() {
         const userMsg: ChatMessage = {
             id: uuidSync(),
             text,
+            format: 'PLAIN' as ResponseFormat,
             sender: 'user',
             timestamp: Date.now(),
         };
@@ -28,10 +32,18 @@ export function useChatAgent() {
         setIsTyping(true);
 
         try {
-            const responseText = await ChatService.processMessage(text);
+            const response = await ChatService.processMessage(text);
+
+            // Skip empty responses (superseded jobs)
+            if (!response.text) {
+                setIsTyping(false);
+                return;
+            }
+
             const botMsg: ChatMessage = {
                 id: uuidSync(),
-                text: responseText,
+                text: response.text,
+                format: response.format,
                 sender: 'bot',
                 timestamp: Date.now()
             };
@@ -40,7 +52,8 @@ export function useChatAgent() {
             console.error("Chat error", err);
             const botMsg: ChatMessage = {
                 id: uuidSync(),
-                text: "Sorry, I encountered an error processing that request.",
+                text: "Oops! 😅 Something went wrong. Let me try that again...",
+                format: 'PLAIN',
                 sender: 'bot',
                 timestamp: Date.now()
             };

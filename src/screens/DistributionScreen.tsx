@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useDistributionLogic, CategoryNode } from '../hooks/useDistributionLogic';
 import { SHADOWS, RADIUS, SPACING } from '../styles/theme';
 import { DonutChart } from '../components/common/DonutChart';
+import useTheme from '../hooks/useTheme';
 
 
 
@@ -26,7 +27,8 @@ const DistributionItem = ({
     isSelected,
     isExpanded,
     onToggleExpand,
-    onSelect
+    onSelect,
+    styles
 }: {
     item: CategoryNode,
     color: string,
@@ -34,7 +36,8 @@ const DistributionItem = ({
     isSelected: boolean,
     isExpanded: boolean,
     onToggleExpand: () => void,
-    onSelect: () => void
+    onSelect: () => void,
+    styles: any
 }) => {
     const hasChildren = item.children && item.children.length > 0;
 
@@ -48,12 +51,6 @@ const DistributionItem = ({
             <TouchableOpacity
                 onPress={() => {
                     onSelect();
-                    // If tapping the row body, we also toggle expand? User said "Tapping a list row must select the corresponding slice"
-                    // Use specific icon for expand to be precise? Or toggle on tap?
-                    // Requirement: "When a category row is expanded... chart updates". 
-                    // Let's toggle expand on main tap for intuition, or maybe just select?
-                    // Given requirement "Tapping a slice... Select... Highlight row". 
-                    // Let's decouple: Tap Body -> Select + Toggle Expand.
                     onToggleExpand();
                 }}
                 activeOpacity={0.7}
@@ -87,40 +84,24 @@ const DistributionItem = ({
             {/* Children List */}
             {isExpanded && hasChildren && (
                 <View style={[styles.childrenContainer, { backgroundColor: schemeColors.bgMid }]}>
-                    {item.children.map((child) => {
-                        // Check if this child is selected (global selectedId matches child.id)
-                        // But we need to pass that down.
-                        // Actually, the parent handles "isSelected" logic for itself. 
-                        // We need a way to highlight children. 
-                        // DistributionItem is only for Top Level.
-                        // We should render children here.
-                        // We need global 'selectedId' passed here to check children?
-                        // Or better, let parent check.
-                        // Since DistributionItem receives props, we can't easily access global selectedId unless we pass it or the component is context-aware.
-                        // Let's pass `selectedChildId` or just `selectedId`.
-                        // But for simplicity, we only "Highlight its row". 
-                        // If a child is selected, we highlight the child row.
-
-                        // Wait, I need to pass `selectedId` to DistributionItem to check against children?
-                        // Or just iterate here.
-                        return (
-                            <ChildRow
-                                key={child.id}
-                                item={child}
-                                schemeColors={schemeColors}
-                                isSelected={false} // Will fix in parent map
-                                onSelect={() => { }} // Will fix in parent map
-                            />
-                        );
-                    })}
+                    {item.children.map((child: any) => (
+                        <ChildRow
+                            key={child.id}
+                            item={child}
+                            schemeColors={schemeColors}
+                            isSelected={false}
+                            onPress={() => { }} // Children selection not implemented in parent logic yet heavily
+                            styles={styles}
+                        />
+                    ))}
                 </View>
             )}
         </View>
     );
 };
 
-// Extracted Child Row for cleaner render logic inside the screen component or handled inline
-const ChildRow = ({ item, schemeColors, isSelected, onPress }: any) => (
+// Extracted Child Row
+const ChildRow = ({ item, schemeColors, isSelected, onPress, styles }: any) => (
     <TouchableOpacity
         onPress={onPress}
         style={[
@@ -148,9 +129,12 @@ export default function DistributionScreen() {
         filter,
         setFilter,
         chartData: topLevelChartData,
-        listData, // All parent nodes
+        listData,
         totalExpense
     } = useDistributionLogic();
+
+    const { distributionStyle } = useTheme();
+    const styles = distributionStyle;
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -195,9 +179,6 @@ export default function DistributionScreen() {
     // Handle Selection (Chart Tap)
     const handleChartSelect = (id: string | null) => {
         setSelectedId(id);
-        // Requirement: "Tapping a slice... Select that category... Highlight...". 
-        // We do NOT auto-expand on chart tap based on interpretation of "Highlight corresponding row".
-        // Expanding happens via list.
     };
 
     // Handle Expand Toggle
@@ -288,13 +269,7 @@ export default function DistributionScreen() {
                                 {/* Parent Header */}
                                 <TouchableOpacity
                                     onPress={() => {
-                                        // Tap Selects this row logic
                                         setSelectedId(item.id);
-                                        // Tap also toggles expand? 
-                                        // "Tapping a list row must Select corresponding slice"
-                                        // If we don't expand, we select slice in Top Level chart.
-                                        // Users often want to see subcat on tap. 
-                                        // Let's Toggle Expand on tap. 
                                         handleToggleExpand(item.id);
                                     }}
                                     activeOpacity={0.7}
@@ -325,6 +300,7 @@ export default function DistributionScreen() {
                                                 onPress={() => {
                                                     setSelectedId(child.id);
                                                 }}
+                                                styles={styles}
                                             />
                                         ))}
                                     </View>
@@ -337,98 +313,3 @@ export default function DistributionScreen() {
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    // Fixed layout, no simple scroll container anymore
-    scrollContent: {
-        paddingBottom: 40,
-        paddingHorizontal: 0,
-    },
-    totalLabel: {
-        fontSize: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        marginBottom: 4,
-    },
-    totalValue: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    listContainer: {
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        paddingHorizontal: 16,
-        // Elevation/Shadow
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 5,
-        overflow: 'hidden', // Clip top corners
-    },
-    listTitle: {
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    itemContainer: {
-        marginBottom: 0,
-    },
-    itemHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 14,
-    },
-    colorDot: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        marginRight: 12,
-    },
-    itemName: {
-        fontSize: 15,
-        fontWeight: '500',
-        marginBottom: 2,
-    },
-    itemPercent: {
-        fontSize: 12,
-    },
-    itemAmount: {
-        fontSize: 15,
-        fontWeight: '600',
-        marginBottom: 2,
-    },
-    childrenContainer: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        marginBottom: 12,
-    },
-    childRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 4,
-    },
-    childDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        marginRight: 10,
-        marginLeft: 4,
-    },
-    childName: {
-        fontSize: 14,
-        flex: 1,
-    },
-    childAmount: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-});

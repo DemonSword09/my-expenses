@@ -17,8 +17,9 @@ export default function PayeePicker({
   payees,
   onPayeePress,
 }: Props) {
-  const { schemeColors, globalStyle } = useTheme();
+  const { schemeColors, globalStyle, pickerModalStyle } = useTheme();
   const [query, setQuery] = useState('');
+  const styles = pickerModalStyle;
 
   const filteredPayees = useMemo(() => {
     if (!query) return payees;
@@ -34,22 +35,22 @@ export default function PayeePicker({
           <TouchableOpacity onPress={onRequestClose} style={styles.headerButton}>
             <Text style={{ color: schemeColors.primary, fontSize: 17 }}>Cancel</Text>
           </TouchableOpacity>
-          
+
           <Text style={[styles.headerTitle, { color: schemeColors.text }]}>Select Payee</Text>
-          
-          <View style={styles.headerButton} /> 
+
+          <View style={styles.headerButton} />
         </View>
 
         {/* Search */}
         <View style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: schemeColors.border }}>
-             <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search payees"
-                placeholderTextColor={schemeColors.muted}
-                style={[globalStyle.searchInput, { marginBottom: 0 }]}
-                autoFocus={true} // Auto focus when modal opens usually nice
-             />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search payees"
+            placeholderTextColor={schemeColors.muted}
+            style={[globalStyle.searchInput, { marginBottom: 0 }]}
+            autoFocus={true} // Auto focus when modal opens usually nice
+          />
         </View>
 
         {/* List */}
@@ -70,7 +71,7 @@ export default function PayeePicker({
           )}
           ListEmptyComponent={
             <View style={{ padding: 20, alignItems: 'center' }}>
-                <Text style={{ color: schemeColors.muted }}>No payees found.</Text>
+              <Text style={{ color: schemeColors.muted }}>No payees found.</Text>
             </View>
           }
         />
@@ -78,24 +79,3 @@ export default function PayeePicker({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 56,
-    borderBottomWidth: 0.5,
-  },
-  headerButton: {
-    minWidth: 60,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-});

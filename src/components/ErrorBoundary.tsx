@@ -13,49 +13,10 @@ interface State {
     error: Error | null;
 }
 
-const getStyles = (colors: any) => StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: colors.background,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 10,
-        color: colors.danger,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: colors.textMuted,
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    errorBox: {
-        maxHeight: 200,
-        width: '100%',
-        backgroundColor: colors.surface,
-        padding: 10,
-        borderRadius: 5,
-        marginBottom: 20,
-    },
-    errorText: {
-        fontFamily: 'monospace',
-        fontSize: 12,
-        color: colors.text,
-    },
-    button: {
-        width: '100%',
-        backgroundColor: colors.primary,
-    }
-});
-
 // Wrapper to inject theme hooks
 export default function ErrorBoundaryWrapper({ children }: { children: ReactNode }) {
-    const { schemeColors } = useTheme();
-    const styles = getStyles(schemeColors);
+    const { schemeColors, errorStyle } = useTheme();
+    const styles = errorStyle;
     return <ErrorBoundaryInner styles={styles}>{children}</ErrorBoundaryInner>;
 }
 
@@ -96,13 +57,22 @@ class ErrorBoundaryInner extends Component<{ children: ReactNode; styles: any },
                         <Text style={styles.errorText}>{this.state.error?.toString()}</Text>
                     </ScrollView>
 
-                    <Button
-                        mode="contained"
-                        onPress={this.handleRestart}
-                        style={styles.button}
-                    >
-                        Try Again
-                    </Button>
+                    <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'center' }}>
+                        <Button
+                            mode="outlined"
+                            onPress={() => Logger.shareLogs()}
+                            style={[styles.button, { flex: 1 }]}
+                        >
+                            Share Logs
+                        </Button>
+                        <Button
+                            mode="contained"
+                            onPress={this.handleRestart}
+                            style={[styles.button, { flex: 1 }]}
+                        >
+                            Try Again
+                        </Button>
+                    </View>
                 </View>
             );
         }

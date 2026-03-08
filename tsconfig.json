@@ -20,5 +20,5 @@
     }
   },
   "include": ["src/**/*", "app.json", "metro.config.js"],
-  "exclude": ["node_modules", "babel.config.js", "e2e"]
+  "exclude": ["node_modules", "babel.config.js", "e2e","ml_service"]
 }

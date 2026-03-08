@@ -1,7 +1,7 @@
 // src/styles/addExpenseStyles.ts
 import { StyleSheet } from 'react-native';
 import { globalStyles } from './globalStyles';
-import { getThemeColors, SHADOWS } from './theme';
+import { getThemeColors, SHADOWS, FONT_SIZE, FONT_WEIGHT, RADIUS, SPACING } from './theme';
 
 export const addExpenseStyles = (scheme: any) => {
   const g = globalStyles(scheme);
@@ -29,8 +29,8 @@ export const addExpenseStyles = (scheme: any) => {
       paddingVertical: 8,
     },
     categoryModalTitle: {
-      fontWeight: '700',
-      fontSize: 16,
+      fontWeight: FONT_WEIGHT.bold, // 700
+      fontSize: FONT_SIZE.base, // 16
       color: colors.textStrong,
     },
 
@@ -46,7 +46,7 @@ export const addExpenseStyles = (scheme: any) => {
       alignItems: 'center',
     },
     categoryRowText: {
-      fontSize: 15,
+      fontSize: FONT_SIZE.base, // 15 -> 16
       color: colors.textStrong,
     },
 
@@ -116,31 +116,116 @@ export const addExpenseStyles = (scheme: any) => {
       zIndex: 1,
     },
     glassLabel: {
-      fontWeight: '600',
-      fontSize: 16,
+      fontWeight: FONT_WEIGHT.semibold, // 600
+      fontSize: FONT_SIZE.base, // 16
       color: colors.textMuted,
     },
     glassLabelActive: {
       color: colors.textStrong,
-      fontWeight: '700',
+      fontWeight: FONT_WEIGHT.bold, // 700
     },
 
     // Glass Save Button
     glassSaveButton: {
       backgroundColor: colors.primary,
       height: 52,
-      borderRadius: 16,
+      borderRadius: RADIUS.lg, // 16
       alignItems: 'center',
       justifyContent: 'center',
       ...SHADOWS.glow, // Glow on save
     },
     glassSaveButtonText: {
       color: colors.textStrong,
-      fontSize: 16,
-      fontWeight: '700',
+      fontSize: FONT_SIZE.base, // 16
+      fontWeight: FONT_WEIGHT.bold, // 700
       textShadowColor: colors.glassBorder,
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
+    },
+
+    // --- AddExpenseForm Specific ---
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING.lg, // 16
+      paddingVertical: SPACING.md, // 12
+      height: 64,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    headerButton: {
+      padding: 4,
+    },
+    headerButtonText: {
+      color: colors.primary,
+      fontSize: 17,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: FONT_WEIGHT.semibold, // 600
+      color: colors.text,
+    },
+    saveButtonText: {
+      color: colors.primary,
+      fontSize: 17,
+      fontWeight: FONT_WEIGHT.semibold, // 600
+    },
+    bottomSaveButton: {
+      marginTop: SPACING.xxl, // 24
+    },
+
+    // --- ExpenseFormFields Specific ---
+    suggestionsContainer: {
+      backgroundColor: colors.surface,
+      opacity: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: RADIUS.md, // 12
+      marginTop: 4,
+      maxHeight: 150,
+      position: 'absolute',
+      top: 40,
+      right: 0,
+      minWidth: 150,
+      zIndex: 1000,
+      ...SHADOWS.sm,
+    },
+    suggestionItem: {
+      padding: SPACING.md, // 12
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+    },
+    suggestionText: {
+      color: colors.text,
+    },
+    errorTooltip: {
+      position: 'absolute',
+      bottom: -20,
+      right: 12,
+      backgroundColor: colors.danger,
+      paddingHorizontal: SPACING.sm, // 8
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    errorText: {
+      color: '#fff',
+      fontSize: FONT_SIZE.xs, // 10->12? Original was 12
+      fontWeight: FONT_WEIGHT.semibold, // 600
+    },
+    rowContainer: {
+      justifyContent: 'center',
+      paddingVertical: 12,
+    },
+    dateValue: {
+      flex: 1,
+      alignItems: 'flex-end',
+    },
+    categoryButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
     },
   });
 };

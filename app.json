@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "my-expenses",
-    "slug": "my-expenses",
-    "version": "0.0.1",
+    "name": "Expenses",
+    "slug": "my-expenses-beta",
+    "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,8 +17,9 @@
     },
     "android": {
       "package": "com.harsh.myexpenses",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/splash-icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,

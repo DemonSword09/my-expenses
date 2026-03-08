@@ -1,4 +1,3 @@
-// src/components/TemplateEditor.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Modal,
@@ -13,6 +12,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useTheme from '../../hooks/useTheme';
@@ -41,7 +41,7 @@ type Props = {
 };
 
 export default function TemplateEditor({ visible, onRequestClose, onSave, initial }: Props) {
-  const { globalStyle, schemeColors, scheme } = useTheme();
+  const { globalStyle, schemeColors, scheme, templateStyle } = useTheme();
   const isDark = scheme === 'dark';
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -114,20 +114,10 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
     const parsedAmount = Number(amount);
     const finalAmount = transactionType === 'EXPENSE' ? -Math.abs(parsedAmount) : Math.abs(parsedAmount);
 
-    const tpl = {
+    const tpl: any = {
       amount: finalAmount,
       merchant,
-      payeeId: initial?.template?.payeeId, // Preserve existing payeeId if any, or it will be resolved on save?
-      // Wait, useAddExpense resolves payeeId internally on save, but here we are building a template.
-      // We need to resolve payeeId here or store the name and resolve later?
-      // The current logic stores 'merchant' name. 
-      // RecurrenceEngine resolves it.
-      // But RecurrenceCalendarModal uses TransactionRepo.create which expects payeeId.
-      // Let's store payeeId if we have it.
-      // Actually, useAddExpense doesn't expose payeeId directly unless we look at 'payees'.
-      // Let's try to resolve it or just rely on 'merchant' string and let the consumer handle it?
-      // TransactionRepo.create doesn't resolve merchant name to payeeId automatically.
-      // We need to resolve it here.
+      payeeId: initial?.template?.payeeId,
       comment: notes,
       categoryId: selectedCategory?.id,
       transaction_type: transactionType,
@@ -173,210 +163,163 @@ export default function TemplateEditor({ visible, onRequestClose, onSave, initia
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onRequestClose}>
-      <View style={[styles.container, { backgroundColor: schemeColors.background }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: schemeColors.border }]}>
-          <TouchableOpacity onPress={onRequestClose} style={styles.headerButton}>
-            <Text style={{ color: schemeColors.primary, fontSize: 17 }}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: schemeColors.text }]}>
-            {initial ? 'Edit Template' : 'New Template'}
-          </Text>
-          <TouchableOpacity onPress={save} disabled={loading} style={styles.headerButton}>
-            {loading ? (
-              <ActivityIndicator size="small" color={schemeColors.primary} />
-            ) : (
-              <Text style={{ color: schemeColors.primary, fontSize: 17, fontWeight: '600' }}>Save</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: schemeColors.background }} edges={['top', 'left', 'right']}>
+        <View style={[templateStyle.editorContainer, { backgroundColor: schemeColors.background, flex: 1 }]}>
+          {/* Header */}
+          <View style={templateStyle.editorModalHeader}>
+            <TouchableOpacity onPress={onRequestClose} style={templateStyle.headerButton}>
+              <Text style={{ color: schemeColors.primary, fontSize: 17 }}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[templateStyle.editorTitle, { color: schemeColors.text }]}>
+              {initial ? 'Edit Template' : 'New Template'}
+            </Text>
+            <TouchableOpacity onPress={save} disabled={loading} style={templateStyle.headerButton}>
+              {loading ? (
+                <ActivityIndicator size="small" color={schemeColors.primary} />
+              ) : (
+                <Text style={{ color: schemeColors.primary, fontSize: 17, fontWeight: '600' }}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 50}
+          >
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
 
-            {/* Template Info Section */}
-            <View style={globalStyle.formSection}>
-              <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
-                <Text style={globalStyle.rowLabel}>Name</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. Monthly Rent"
-                  placeholderTextColor={schemeColors.muted}
-                  style={globalStyle.rowInput}
+              {/* Template Info Section */}
+              <View style={globalStyle.formSection}>
+                <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
+                  <Text style={globalStyle.rowLabel}>Name</Text>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="e.g. Monthly Rent"
+                    placeholderTextColor={schemeColors.muted}
+                    style={globalStyle.rowInput}
+                  />
+                </View>
+              </View>
+
+              <Text style={globalStyle.sectionHeader}>TRANSACTION DETAILS</Text>
+              <View style={[globalStyle.formSection, { paddingVertical: 0, paddingHorizontal: 0 }]}>
+                <ExpenseFormFields
+                  amount={amount}
+                  setAmount={setAmount}
+                  merchant={merchant}
+                  setMerchant={setMerchant}
+                  notes={notes}
+                  setNotes={setNotes}
+                  dateMs={dateMs}
+                  openDatePicker={openDatePicker}
+                  selectedCategory={selectedCategory}
+                  openCategoryPicker={openCategoryPicker}
+                  variant="list"
+                  payees={payees}
+                  onMerchantSelect={onMerchantSelect}
+                  transactionType={transactionType}
+                  setTransactionType={setTransactionType}
                 />
               </View>
-            </View>
 
-            <Text style={globalStyle.sectionHeader}>TRANSACTION DETAILS</Text>
-            <View style={[globalStyle.formSection, { paddingVertical: 0, paddingHorizontal: 0 }]}>
-              <ExpenseFormFields
-                amount={amount}
-                setAmount={setAmount}
-                merchant={merchant}
-                setMerchant={setMerchant}
-                notes={notes}
-                setNotes={setNotes}
-                dateMs={dateMs}
-                openDatePicker={openDatePicker}
-                selectedCategory={selectedCategory}
-                openCategoryPicker={openCategoryPicker}
-                variant="list"
-                payees={payees}
-                onMerchantSelect={onMerchantSelect}
-                transactionType={transactionType}
-                setTransactionType={setTransactionType}
-              />
-            </View>
+              <Text style={globalStyle.sectionHeader}>AUTOMATION</Text>
+              <View style={globalStyle.formSection}>
+                <View style={[globalStyle.row, { justifyContent: 'space-between', borderBottomWidth: isRecurring ? StyleSheet.hairlineWidth : 0 }]}>
+                  <Text style={globalStyle.rowLabel}>Recurring</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsRecurring(!isRecurring)}
+                    style={[
+                      templateStyle.toggle,
+                      { backgroundColor: isRecurring ? schemeColors.primary : schemeColors.border }
+                    ]}
+                  >
+                    <View style={[templateStyle.toggleKnob, { transform: [{ translateX: isRecurring ? 18 : 2 }] }]} />
+                  </TouchableOpacity>
+                </View>
 
-            <Text style={globalStyle.sectionHeader}>AUTOMATION</Text>
-            <View style={globalStyle.formSection}>
-              <View style={[globalStyle.row, { justifyContent: 'space-between', borderBottomWidth: isRecurring ? StyleSheet.hairlineWidth : 0 }]}>
-                <Text style={globalStyle.rowLabel}>Recurring</Text>
-                <TouchableOpacity
-                  onPress={() => setIsRecurring(!isRecurring)}
-                  style={[
-                    styles.toggle,
-                    { backgroundColor: isRecurring ? schemeColors.primary : schemeColors.border }
-                  ]}
-                >
-                  <View style={[styles.toggleKnob, { transform: [{ translateX: isRecurring ? 18 : 2 }] }]} />
-                </TouchableOpacity>
+                {isRecurring && (
+                  <View style={{ padding: 16, paddingTop: 0 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginTop: 12 }}>
+                      {(['daily', 'weekdays', 'weekly', 'monthly'] as RecurrencePreset[]).map((p) => (
+                        <TouchableOpacity
+                          key={p}
+                          onPress={() => setPreset(p)}
+                          style={[
+                            templateStyle.chip,
+                            {
+                              backgroundColor: preset === p ? schemeColors.primary : schemeColors.background,
+                              borderColor: preset === p ? schemeColors.primary : schemeColors.border,
+                            }
+                          ]}
+                        >
+                          <Text style={{ color: preset === p ? '#fff' : schemeColors.text, textTransform: 'capitalize' }}>
+                            {p}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+
+                    <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
+                      <Text style={{ color: schemeColors.text, flex: 1 }}>Time</Text>
+                      <TextInput
+                        value={timeOfDay}
+                        onChangeText={setTimeOfDay}
+                        placeholder="09:00"
+                        placeholderTextColor={schemeColors.muted}
+                        style={[templateStyle.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
+                      />
+                    </View>
+
+                    {preset === 'weekly' && (
+                      <View style={[globalStyle.row, { marginTop: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0 }]}>
+                        <Text style={{ color: schemeColors.text, flex: 1 }}>Weekday (0=Sun)</Text>
+                        <TextInput
+                          value={String(weekday)}
+                          onChangeText={(t) => setWeekday(Number(t) || 0)}
+                          keyboardType="numeric"
+                          style={[templateStyle.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
+                        />
+                      </View>
+                    )}
+
+                    {preset === 'monthly' && (
+                      <View style={[globalStyle.row, { marginTop: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0 }]}>
+                        <Text style={{ color: schemeColors.text, flex: 1 }}>Day of Month</Text>
+                        <TextInput
+                          value={String(dayOfMonth)}
+                          onChangeText={(t) => setDayOfMonth(Math.max(1, Math.min(31, Number(t) || 1)))}
+                          keyboardType="numeric"
+                          style={[templateStyle.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
+                        />
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
 
-              {isRecurring && (
-                <View style={{ padding: 16, paddingTop: 0 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginTop: 12 }}>
-                    {(['daily', 'weekdays', 'weekly', 'monthly'] as RecurrencePreset[]).map((p) => (
-                      <TouchableOpacity
-                        key={p}
-                        onPress={() => setPreset(p)}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: preset === p ? schemeColors.primary : schemeColors.background,
-                            borderColor: preset === p ? schemeColors.primary : schemeColors.border,
-                          }
-                        ]}
-                      >
-                        <Text style={{ color: preset === p ? '#fff' : schemeColors.text, textTransform: 'capitalize' }}>
-                          {p}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
 
-                  <View style={[globalStyle.row, { borderBottomWidth: 0 }]}>
-                    <Text style={{ color: schemeColors.text, flex: 1 }}>Time</Text>
-                    <TextInput
-                      value={timeOfDay}
-                      onChangeText={setTimeOfDay}
-                      placeholder="09:00"
-                      placeholderTextColor={schemeColors.muted}
-                      style={[styles.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
-                    />
-                  </View>
-
-                  {preset === 'weekly' && (
-                    <View style={[globalStyle.row, { marginTop: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0 }]}>
-                      <Text style={{ color: schemeColors.text, flex: 1 }}>Weekday (0=Sun)</Text>
-                      <TextInput
-                        value={String(weekday)}
-                        onChangeText={(t) => setWeekday(Number(t) || 0)}
-                        keyboardType="numeric"
-                        style={[styles.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
-                      />
-                    </View>
-                  )}
-
-                  {preset === 'monthly' && (
-                    <View style={[globalStyle.row, { marginTop: 0, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: 0 }]}>
-                      <Text style={{ color: schemeColors.text, flex: 1 }}>Day of Month</Text>
-                      <TextInput
-                        value={String(dayOfMonth)}
-                        onChangeText={(t) => setDayOfMonth(Math.max(1, Math.min(31, Number(t) || 1)))}
-                        keyboardType="numeric"
-                        style={[styles.smallInput, { color: schemeColors.text, backgroundColor: schemeColors.background }]}
-                      />
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-
-        <CategoryPicker
-          visible={catModalVisible}
-          onRequestClose={closeCategoryPicker}
-          categories={categories}
-          onCategoryPress={onCategoryPress}
-        />
-
-        {showPicker && (
-          <DateTimePicker
-            value={new Date(dateMs)}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
+          <CategoryPicker
+            visible={catModalVisible}
+            onRequestClose={closeCategoryPicker}
+            categories={categories}
+            onCategoryPress={onCategoryPress}
           />
-        )}
-      </View>
+
+          {showPicker && (
+            <DateTimePicker
+              value={new Date(dateMs)}
+              mode="date"
+              display="default"
+              onChange={onDateChange}
+            />
+          )}
+        </View>
+      </SafeAreaView>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 64,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  toggle: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-  },
-  toggleKnob: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 1,
-    elevation: 2,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginRight: 8,
-  },
-  smallInput: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    width: 80,
-    textAlign: 'right',
-  },
-});

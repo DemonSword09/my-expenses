@@ -15,36 +15,7 @@ import { parseCronToPreset } from '../utils/cronPresets';
 // (Assuming import React part is same, just targeting the function body and styles)
 
 export default function TemplatesScreen({ navigation }: any) {
-  const { globalStyle, schemeColors } = useTheme();
-
-  const styles = React.useMemo(() => StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: schemeColors.background,
-    },
-    header: {
-      backgroundColor: schemeColors.background,
-      elevation: 0,
-    },
-    headerTitle: {
-      fontWeight: '700',
-      color: schemeColors.text,
-    },
-    listContent: {
-      paddingBottom: 120,
-      paddingTop: 16,
-    },
-    emptyState: {
-      alignItems: 'center',
-      marginTop: 64,
-      paddingHorizontal: 32,
-    },
-    emptyText: {
-      fontSize: 16,
-      textAlign: 'center',
-      color: schemeColors.muted,
-    },
-  }), [schemeColors]);
+  const { globalStyle, schemeColors, templateStyle } = useTheme();
 
   const {
     templates,
@@ -205,10 +176,10 @@ export default function TemplatesScreen({ navigation }: any) {
   ), [onInstantiate, onEdit, onDelete]);
 
   return (
-    <View style={styles.container}>
-      <Appbar.Header style={styles.header}>
+    <View style={templateStyle.container}>
+      <Appbar.Header style={templateStyle.header}>
         <Appbar.BackAction onPress={() => navigation.goBack()} color={schemeColors.text} />
-        <Appbar.Content title="Templates" titleStyle={styles.headerTitle} />
+        <Appbar.Content title="Templates" titleStyle={templateStyle.headerTitle} />
         <Appbar.Action icon="calendar-clock" onPress={() => setScheduleVisible(true)} color={schemeColors.text} />
         {/* <Appbar.Action icon="bug" onPress={() => navigation.navigate('Debug')} color={schemeColors.text} /> */}
         <Appbar.Action icon="plus" onPress={onAdd} color={schemeColors.primary} />
@@ -218,11 +189,11 @@ export default function TemplatesScreen({ navigation }: any) {
         data={viewData}
         keyExtractor={(t) => t.id}
         renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={templateStyle.listContent}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
+          <View style={templateStyle.emptyState}>
+            <Text style={templateStyle.emptyText}>
               No templates yet. Tap + to create one.
             </Text>
           </View>

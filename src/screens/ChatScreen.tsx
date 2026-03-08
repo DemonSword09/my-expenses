@@ -1,19 +1,46 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, Text, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+    View,
+    FlatList,
+    TextInput,
+    TouchableOpacity,
+    Text,
+    KeyboardAvoidingView,
+    Keyboard,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { useNavigation } from '@react-navigation/native';
+
 import useTheme from '../hooks/useTheme';
 import { useChatAgent } from '../hooks/useChatAgent';
 import { ChatMessage } from '../services/ChatService';
-import { useNavigation } from '@react-navigation/native';
+import { ConversationContext } from '../services/chat/ConversationContext';
+import SimpleMarkdown from '../components/SimpleMarkdown';
 
 export default function ChatScreen() {
-    const { schemeColors, globalStyle } = useTheme();
+    const { schemeColors, globalStyle, chatStyle, chatScreenStyle } = useTheme();
     const navigation = useNavigation();
     const { messages, sendMessage, isTyping } = useChatAgent();
     const [inputText, setInputText] = useState('');
     const flatListRef = useRef<FlatList>(null);
+    const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+    useEffect(() => {
+        const showSubscription = Keyboard.addListener('keyboardDidShow', () =>
+            setKeyboardVisible(true)
+        );
+        const hideSubscription = Keyboard.addListener('keyboardDidHide', () =>
+            setKeyboardVisible(false)
+        );
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+            ConversationContext.reset();
+        };
+    }, []);
 
     const handleSend = () => {
         if (inputText.trim()) {
@@ -26,143 +53,120 @@ export default function ChatScreen() {
         setTimeout(() => {
             flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
-    }, [messages]);
+    }, [messages, isKeyboardVisible]);
 
     const renderItem = ({ item }: { item: ChatMessage }) => {
         const isUser = item.sender === 'user';
+        const textColor = isUser ? '#ffffff' : schemeColors.text;
+
         return (
-            <View style={[
-                styles.messageContainer,
-                isUser ? styles.userMessageContainer : styles.botMessageContainer
-            ]}>
-                <View style={[
-                    styles.bubble,
-                    isUser ? { backgroundColor: schemeColors.primary } : { backgroundColor: schemeColors.glassBg }
-                ]}>
-                    <Text
-                        selectable={true}
-                        style={[
-                            styles.messageText,
-                            isUser ? { color: '#ffffff' } : { color: schemeColors.text }
-                        ]}>
-                        {item.text}
-                    </Text>
+            <View
+                style={[
+                    chatStyle.messageContainer,
+                    isUser
+                        ? chatStyle.userMessageContainer
+                        : chatStyle.botMessageContainer,
+                ]}
+            >
+                <View
+                    style={[
+                        chatStyle.bubble,
+                        isUser
+                            ? { backgroundColor: schemeColors.primary }
+                            : { backgroundColor: schemeColors.glassBg },
+                    ]}
+                >
+                    {isUser ? (
+                        <Text
+                            selectable={true}
+                            style={[chatStyle.messageText, { color: textColor }]}
+                        >
+                            {item.text}
+                        </Text>
+                    ) : (
+                        <SimpleMarkdown
+                            text={item.text}
+                            format={item.format || 'PLAIN'}
+                            baseStyle={{ ...chatStyle.messageText, color: textColor }}
+                            boldColor={schemeColors.primary}
+                        />
+                    )}
                 </View>
-                <Text style={styles.timestamp}>
-                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <Text style={chatStyle.timestamp}>
+                    {new Date(item.timestamp).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    })}
                 </Text>
-            </View >
+            </View>
         );
     };
 
     return (
-        <SafeAreaView style={[globalStyle.container]} edges={['top', 'left', 'right']}>
-            <StatusBar style="auto" />
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: schemeColors.divider }}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 8 }}>
-                    <Ionicons name="arrow-back" size={24} color={schemeColors.text} />
-                </TouchableOpacity>
-                <Text style={{ fontSize: 20, fontWeight: '600', marginLeft: 16, color: schemeColors.text }}>Expense Assistant</Text>
-            </View>
-
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // ~ Header height + Status bar
+        <KeyboardAvoidingView
+            style={chatScreenStyle.keyboardView}
+            behavior="padding"
+            keyboardVerticalOffset={isKeyboardVisible ? 0 : 40}
+        >
+            <SafeAreaView
+                style={[globalStyle.container, { flex: 1 }]}
+                edges={['top', 'left', 'right', 'bottom']}
             >
+                <StatusBar style="auto" />
+
+                <View style={chatScreenStyle.header}>
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={chatScreenStyle.backButton}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={schemeColors.text} />
+                    </TouchableOpacity>
+                    <Text style={chatScreenStyle.headerTitle}>Expense Assistant</Text>
+                </View>
+
                 <FlatList
                     ref={flatListRef}
                     data={messages}
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={chatStyle.listContent}
                     style={{ flex: 1 }}
                 />
 
                 {isTyping && (
-                    <View style={{ padding: 10, marginLeft: 10 }}>
-                        <Text style={{ color: schemeColors.textMuted }}>Agent is typing...</Text>
+                    <View style={chatScreenStyle.typingIndicator}>
+                        <Text style={chatScreenStyle.typingText}>Agent is typing...</Text>
                     </View>
                 )}
 
-                <View style={[styles.inputContainer, { backgroundColor: schemeColors.surface, borderTopColor: schemeColors.divider }]}>
-                    <TextInput
-                        style={[styles.input, {
-                            backgroundColor: schemeColors.background,
-                            color: schemeColors.text,
-                            borderColor: schemeColors.divider,
-                            borderWidth: 1
-                        }]}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        placeholder="Type a command..."
-                        placeholderTextColor={schemeColors.textMuted}
-                        onSubmitEditing={handleSend}
-                    />
-                    <TouchableOpacity
-                        onPress={handleSend}
-                        disabled={!inputText.trim()}
-                        style={[styles.sendButton, { backgroundColor: inputText.trim() ? schemeColors.primary : schemeColors.surface }]}
-                    >
-                        <Ionicons name="send" size={20} color={inputText.trim() ? '#ffffff' : schemeColors.textMuted} />
-                    </TouchableOpacity>
+                <View style={[chatStyle.inputContainer, { backgroundColor: 'transparent' }]}>
+                    <BlurView intensity={80} tint="dark" style={chatStyle.pillContainer}>
+                        <TextInput
+                            style={chatStyle.input}
+                            value={inputText}
+                            onChangeText={setInputText}
+                            placeholder="Type a command..."
+                            placeholderTextColor={schemeColors.textMuted}
+                            onSubmitEditing={handleSend}
+                            selectionColor={schemeColors.primary}
+                        />
+                        <TouchableOpacity
+                            onPress={handleSend}
+                            disabled={!inputText.trim()}
+                            style={[
+                                chatStyle.sendButton,
+                                {
+                                    backgroundColor: inputText.trim()
+                                        ? schemeColors.primary
+                                        : 'rgba(255,255,255,0.1)',
+                                },
+                            ]}
+                        >
+                            <Ionicons name="arrow-up" size={24} color={'#ffffff'} />
+                        </TouchableOpacity>
+                    </BlurView>
                 </View>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+            </SafeAreaView>
+        </KeyboardAvoidingView>
     );
 }
-
-const styles = StyleSheet.create({
-    listContent: {
-        padding: 16,
-        paddingBottom: 20,
-    },
-    messageContainer: {
-        marginBottom: 12,
-        maxWidth: '80%',
-    },
-    userMessageContainer: {
-        alignSelf: 'flex-end',
-        alignItems: 'flex-end',
-    },
-    botMessageContainer: {
-        alignSelf: 'flex-start',
-        alignItems: 'flex-start',
-    },
-    bubble: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-    },
-    messageText: {
-        fontSize: 16,
-        lineHeight: 22,
-    },
-    timestamp: {
-        fontSize: 10,
-        color: '#999',
-        marginTop: 4,
-        marginHorizontal: 4
-    },
-    inputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        borderTopWidth: 1,
-    },
-    input: {
-        flex: 1,
-        height: 44,
-        borderRadius: 22,
-        paddingHorizontal: 16,
-        fontSize: 16,
-        marginRight: 10,
-    },
-    sendButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-});

@@ -1,158 +1,247 @@
-import Papa from 'papaparse'
-import { parse, isValid, format as formatDate } from 'date-fns'
+import Papa from 'papaparse';
+import { parse, isValid } from 'date-fns';
+import { AppField, ColumnMapping } from '../db/models';
+import { normalizeAmount, capitalizeFirstLetter } from './format-utils';
+import { DATE_FORMATS } from '../constants';
 
 export class CsvHelper {
   static parseCsv(fileContent: string): Promise<{
-    headers: string[]
-    rows: Record<string, string>[]
+    headers: string[];
+    rows: Record<string, string>[];
   }> {
     return new Promise((resolve, reject) => {
       Papa.parse(fileContent, {
         header: true,
         skipEmptyLines: true,
+        fastMode: true,
         complete: (result) => {
           resolve({
             headers: result.meta.fields || [],
             rows: result.data as Record<string, string>[],
-          })
+          });
         },
         error: reject,
-      })
-    })
+      });
+    });
+  }
+
+  /**
+   * Fast preview - reads ONLY first N rows without scanning entire file
+   * Uses Papa's preview option to stop parsing early
+   * Target: <300ms for any file size
+   */
+  static parseCsvPreview(
+    fileContent: string,
+    previewRows: number
+  ): Promise<{
+    headers: string[];
+    rows: Record<string, string>[];
+  }> {
+    return new Promise((resolve, reject) => {
+      Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        preview: previewRows, // CRITICAL: stops after N rows
+        fastMode: true,
+        complete: (result) => {
+          resolve({
+            headers: result.meta.fields || [],
+            rows: result.data as Record<string, string>[],
+          });
+        },
+        error: reject,
+      });
+    });
+  }
+
+  /**
+   * Streaming CSV parser for large files
+   * Processes in chunks to prevent UI freezing
+   * Automatically yields to event loop between chunks
+   */
+  static streamCsv(
+    fileContent: string,
+    fileSize: number,
+    onChunk: (rows: Record<string, string>[], headers: string[]) => void | Promise<void>,
+    onProgress?: (processed: number, total: number) => void
+  ): Promise<{
+    headers: string[];
+    totalRows: number;
+  }> {
+    return new Promise((resolve, reject) => {
+      let headers: string[] = [];
+      let totalRows = 0;
+      const chunkSize = 100; // Process 100 rows at a time
+      let buffer: Record<string, string>[] = [];
+
+      let previousCursor = 0;
+
+      Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        fastMode: true,
+        chunk: async (results: Papa.ParseResult<Record<string, string>>, parser: Papa.Parser) => {
+          // Pause parsing during processing
+          parser.pause();
+
+          try {
+            // Get headers from first chunk
+            if (!headers.length && results.meta.fields) {
+              headers = results.meta.fields;
+            }
+
+            const rows = results.data as Record<string, string>[];
+            const chunkTotal = rows.length;
+
+            // Push rows to buffer
+            buffer.push(...rows);
+
+            // Prepare for interpolation
+            const currentCursor = results.meta.cursor || 0;
+            const cursorDiff = currentCursor - previousCursor;
+            let processedInThisChunk = 0;
+
+            // Process fully filled chunks
+            while (buffer.length >= chunkSize) {
+              const batch = buffer.splice(0, chunkSize);
+              await onChunk(batch, headers);
+
+              totalRows += batch.length;
+              processedInThisChunk += batch.length;
+
+              // Interpolate progress!
+              if (onProgress && chunkTotal > 0) {
+                const fraction = Math.min(processedInThisChunk / chunkTotal, 1);
+                const interpolatedCursor = previousCursor + (cursorDiff * fraction);
+
+                onProgress(interpolatedCursor, fileSize);
+              }
+
+              // Yield to event loop
+              await new Promise((r) => requestAnimationFrame(r));
+            }
+
+            previousCursor = currentCursor;
+
+            // Resume parsing for next chunk
+            parser.resume();
+          } catch (error) {
+            console.error('Stream processing error:', error);
+            parser.abort();
+            reject(error);
+          }
+        },
+        complete: async () => {
+          try {
+            if (buffer.length > 0) {
+              await onChunk(buffer, headers);
+              totalRows += buffer.length;
+            }
+
+            resolve({ headers, totalRows });
+          } catch (error) {
+            console.error('Stream complete error:', error);
+            reject(error);
+          }
+        },
+        error: (error: Error) => {
+          console.error('Papa parse error:', error);
+          reject(error);
+        },
+      });
+    });
   }
 
   static detectDateFormat(sample: string): string | null {
-    let cleanSample = sample.trim()
-    // Normalize JAN -> Jan, DEC -> Dec, etc. only if not already mixed case likely
-    cleanSample = cleanSample.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
-      match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
-    )
+    if (!sample || typeof sample !== 'string') return null;
 
-    // date-fns format tokens: yyyy, dd, MM
-    const formats = [
-      'yyyy-MM-dd',
-      'dd/MM/yyyy',
-      'MM/dd/yyyy',
-      'd-MMM-yyyy',
-      'd-MMM-yy',
-      'dd-MMM-yyyy',
-      'dd-MMM-yy',
-      'dd-MM-yyyy',
-      'MMM dd, yyyy',
-    ]
+    // Strip quotes and trim
+    const normalized = sample
+      .replace(/^["']|["']$/g, '')
+      .trim()
+      .replace(/\b([a-zA-Z]{3})\b/g, (match) =>
+        capitalizeFirstLetter(match)
+      );
 
-    const now = new Date()
-    for (const fmt of formats) {
-      // strict parsing reference date
-      const parsed = parse(cleanSample, fmt, now)
-      if (isValid(parsed)) {
-        // Check if strict parsing actually matches the length/format roughly to avoid false positives (like 2023-01-01 parsing as d-MMM-yy)
-        return fmt
-      }
+    for (const format of DATE_FORMATS) {
+      const parsed = parse(normalized, format, new Date());
+      if (isValid(parsed)) return format;
     }
-    return null
+
+    return null;
   }
 
-  static normalizeDate(
-    value: string,
-    fmt: string
-  ): string | null {
-    let cleanValue = value.trim()
-    // Normalize JAN -> Jan, DEC -> Dec, etc.
-    cleanValue = cleanValue.replace(/\b([a-zA-Z]{3})\b/g, (match) =>
-      match.charAt(0).toUpperCase() + match.slice(1).toLowerCase()
-    )
+  static normalizeDate(value: string, format: string): string | null {
+    if (!value || !format) return null;
 
-    const parsed = parse(cleanValue, fmt, new Date())
-    return isValid(parsed) ? parsed.toISOString() : null
+    const cleaned = value
+      .trim()
+      .replace(/\b([a-zA-Z]{3})\b/g, (match) =>
+        capitalizeFirstLetter(match)
+      );
+
+    const parsed = parse(cleaned, format, new Date());
+    return isValid(parsed) ? parsed.toISOString() : null;
   }
 
   static normalizeAmount(value: string): number {
-    return Number(
-      value
-        .replace(/[^\d.-]/g, '')
-        .trim()
-    )
+    return normalizeAmount(value);
   }
 
-  static autoMapColumns(headers: string[]): import('../db/models').ColumnMapping[] {
-    const mappings: import('../db/models').ColumnMapping[] = []
-
-    const keywords: Record<string, import('../db/models').AppField> = {
+  static autoMapColumns(headers: string[]): ColumnMapping[] {
+    const keywords: Record<string, AppField> = {
       date: 'date',
       time: 'date',
-      day: 'date',
       amount: 'amount',
-      cost: 'amount',
       price: 'amount',
-      value: 'amount',
       payee: 'payee',
       merchant: 'payee',
-      party: 'payee',
       description: 'payee',
-      desc: 'payee',
       category: 'category',
-      subcategory: 'subcategory',
       note: 'notes',
-      comment: 'notes',
       memo: 'notes',
-      remarks: 'notes',
-    }
+    };
 
-    headers.forEach((header) => {
-      const lower = header.toLowerCase()
-      let mappedField: import('../db/models').AppField = 'ignore' // default
+    return headers.map((header) => {
+      const lower = header.toLowerCase();
+      let appField: AppField = 'ignore';
 
-      // Exact or partial match check
-      for (const [key, field] of Object.entries(keywords)) {
-        if (lower.includes(key)) {
-          mappedField = field
-          break
+      for (const [keyword, field] of Object.entries(keywords)) {
+        if (lower.includes(keyword)) {
+          appField = field;
+          break;
         }
       }
 
-      mappings.push({
+      return {
         csvColumn: header,
-        appField: mappedField,
-      })
-    })
-
-    return mappings
+        appField,
+      };
+    });
   }
 
-  static splitCategory(
-    value: string
-  ): { category: string; subcategory?: string } {
-    // Support >, :, / as separators
-    const parts = value.split(/[:/>]/).map((v) => v.trim())
+  static splitCategory(value: string): {
+    category: string;
+    subcategory: string | undefined;
+  } {
+    if (!value) return { category: '', subcategory: undefined };
+
+    // Improved regex: handles optional spaces around : / or >
+    const parts = value.split(/\s*[:/>]+\s*/).map((part) => part.trim());
     return {
-      category: parts[0],
-      subcategory: parts[1],
-    }
-  }
-
-  static normalizePayee(value: string): string {
-    return value.trim().toLowerCase()
+      category: parts[0] || '',
+      subcategory: parts[1], // undefined if not present, which is correct
+    };
   }
 
   static generateCsv(
-    data: any[],
-    options: {
-      headers?: string[]
-      delimiter?: string
-    } = {}
+    data: Record<string, any>[],
+    options?: { delimiter?: string }
   ): string {
-    const unparseConfig: any = {
-      delimiter: options.delimiter || ',',
+    return Papa.unparse(data, {
+      delimiter: options?.delimiter || ',',
       header: true,
-    };
-
-    // Explicitly handle fields if provided
-    if (options.headers) {
-      unparseConfig.columns = options.headers; // functionality for Papa.unparse depends on input format
-    }
-
-    // Papa.unparse(data, config) where data is array of objects
-    return Papa.unparse(data, unparseConfig);
+      skipEmptyLines: true,
+    });
   }
 }

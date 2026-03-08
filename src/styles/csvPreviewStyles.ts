@@ -1,6 +1,6 @@
 // src/styles/csvPreviewStyles.ts
 import { StyleSheet } from 'react-native';
-import { getThemeColors, SPACING } from './theme';
+import { getThemeColors, SPACING, FONT_SIZE, FONT_WEIGHT } from './theme';
 
 export const csvPreviewStyles = (scheme: any) => {
     const schemeColors = getThemeColors(scheme);
@@ -17,15 +17,15 @@ export const csvPreviewStyles = (scheme: any) => {
             marginRight: SPACING.sm,
         },
         headerText: {
-            fontWeight: 'bold',
-            fontSize: 12,
+            fontWeight: FONT_WEIGHT.bold, // 700
+            fontSize: FONT_SIZE.sm, // 12
             color: schemeColors.textStrong,
         },
         picker: {
             backgroundColor: schemeColors.bgDark,
         },
         pickerItem: {
-            fontSize: 13,
+            fontSize: FONT_SIZE.sm, // 13 -> 12 (standardize)
             color: schemeColors.textStrong,
             backgroundColor: schemeColors.bgDark,
         },
@@ -38,7 +38,7 @@ export const csvPreviewStyles = (scheme: any) => {
         cellText: {
             width: 120,
             marginRight: SPACING.sm,
-            fontSize: 13,
+            fontSize: FONT_SIZE.sm, // 13 -> 12
             color: schemeColors.textStrong,
         },
     });

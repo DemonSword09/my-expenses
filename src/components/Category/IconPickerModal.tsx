@@ -12,8 +12,9 @@ type Props = {
 };
 
 export default function IconPickerModal({ visible, onClose, onSelect, currentIcon }: Props) {
-    const { schemeColors, globalStyle } = useTheme();
+    const { schemeColors, globalStyle, pickerModalStyle } = useTheme();
     const [searchQuery, setSearchQuery] = useState('');
+    const styles = pickerModalStyle; // Alias
 
     // Attempt to get all icons. Fallback to empty if not found.
     const allIcons = useMemo(() => {
@@ -31,7 +32,7 @@ export default function IconPickerModal({ visible, onClose, onSelect, currentIco
     }, [searchQuery, allIcons]);
 
     const renderHeader = () => (
-        <View style={styles.header}>
+        <View style={styles.pickerHeader}>
             <View style={styles.titleRow}>
                 <Text style={[styles.title, { color: schemeColors.text }]}>Select Icon</Text>
                 <TouchableOpacity onPress={onClose}>
@@ -81,12 +82,6 @@ export default function IconPickerModal({ visible, onClose, onSelect, currentIco
         </TouchableOpacity>
     );
 
-    const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
-        <View style={[styles.sectionHeader, { backgroundColor: schemeColors.surface }]}>
-            <Text style={[styles.sectionTitle, { color: schemeColors.muted }]}>{title}</Text>
-        </View>
-    );
-
     return (
         <Modal
             visible={visible}
@@ -113,47 +108,14 @@ export default function IconPickerModal({ visible, onClose, onSelect, currentIco
                         }
                     />
                 ) : (
-                    <SectionList
-                        sections={ICON_CATEGORIES}
-                        renderItem={({ item, index, section }) => {
-                            // We want a grid layout within the section
-                            // But SectionList renders items one by one.
-                            // To make a grid, we need to group data or use a specific layout.
-                            // Simpler: Just render items inline? 
-                            // Actually, let's keep it simple: Render a flex wrap view for the section?
-                            // Standard SectionList renders row by row.
-                            // We can use a custom renderItem that renders nothing, and renderSectionFooter?
-                            // No. 
-
-                            // Let's restructure ICON_CATEGORIES to be SectionList friendly?
-                            // Current structure: { title, data: [icon1, icon2...] }
-                            // SectionList renders 'item' for each string in data.
-                            // If we want a grid, we can't easily do it with standard SectionList unless we pre-chunk the data.
-                            // Alternative: Render a custom component for each Section which is a View with flex-wrap.
-                            // But SectionList expects 'data' to be array of items.
-
-                            // Let's just use RenderItem. 
-                            // But standard renderItem will stack them vertically.
-                            // Fix: Use data as [[icon1, icon2...]] (array of arrays)? No.
-
-                            // Better approach for Categories view:
-                            // Just a ScrollView with mapped categories. We don't need virtualization for the curated list as it's small (~100 icons).
-                            return null;
-                        }}
-                    // Wait, reusing SectionList for grid is tricky.
-                    // I'll swap to a ScrollView for the categories view since it's small enough.
-                    />
-                )}
-
-                {!searchQuery && (
                     <FlatList
                         data={ICON_CATEGORIES}
                         keyExtractor={item => item.title}
-                        renderItem={({ item }) => (
+                        renderItem={({ item }: any) => (
                             <View style={styles.categorySection}>
                                 <Text style={[styles.sectionTitle, { color: schemeColors.muted }]}>{item.title}</Text>
                                 <View style={styles.gridContainer}>
-                                    {item.data.map(icon => (
+                                    {item.data.map((icon: string) => (
                                         <TouchableOpacity
                                             key={icon}
                                             style={[
@@ -188,76 +150,3 @@ export default function IconPickerModal({ visible, onClose, onSelect, currentIco
         </Modal>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    header: {
-        padding: 16,
-        paddingTop: Platform.OS === 'ios' ? 16 : 16,
-    },
-    titleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: 'bold',
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 12,
-        height: 48,
-        paddingHorizontal: 8,
-    },
-    input: {
-        flex: 1,
-        height: '100%',
-        marginLeft: 8,
-        fontSize: 16,
-    },
-    listContent: {
-        padding: 16,
-        paddingBottom: 40,
-    },
-    categorySection: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '700',
-        marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    columnWrapper: {
-        gap: 8,
-        marginBottom: 8,
-    },
-    iconItem: {
-        width: '23%',
-        aspectRatio: 1,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 4,
-    },
-    iconText: {
-        fontSize: 10,
-        marginTop: 4,
-        textAlign: 'center',
-    },
-    sectionHeader: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-    },
-});

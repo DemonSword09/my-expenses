@@ -42,13 +42,14 @@ type UseAddExpenseReturn = {
   reset: () => void;
 };
 
-export default function useAddExpense(editId?: string | undefined, initialData?: any): UseAddExpenseReturn {
+export default function useAddExpense(editId?: string, duplicateFromId?: string, initialData?: any): UseAddExpenseReturn {
   const { categories: allCategories, payees: allPayees, refreshData } = useAppData();
 
   const [merchant, setMerchant] = useState('');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [transactionType, setTransactionType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE');
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   const [catModalVisible, setCatModalVisible] = useState(false);
 
@@ -71,7 +72,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     }
   }, []);
 
-  const loadTransaction = useCallback(async (id: string) => {
+  const loadTransaction = useCallback(async (id: string, isDuplicate: boolean = false) => {
     try {
       const t = await TransactionRepo.findById(id);
       if (!t) return;
@@ -85,7 +86,9 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       setTransactionType(type);
       setAmount(String(Math.abs(t.amount)));
       setNotes(t.comment ?? '');
-      setDateMs(t.createdAt ?? Date.now());
+      // If duplicating, use current time, else use transaction time
+      setDateMs(isDuplicate ? Date.now() : (t.createdAt ?? Date.now()));
+      setAccountId(t.accountId);
 
       if (t.categoryId) {
         const cat = allCategories.find(c => c.id === t.categoryId);
@@ -110,6 +113,10 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     if (editId) {
       (async () => {
         await loadTransaction(editId);
+      })();
+    } else if (duplicateFromId) {
+      (async () => {
+        await loadTransaction(duplicateFromId, true);
       })();
     } else if (initialData) {
       // initialize from passed data (e.g. template)
@@ -143,8 +150,9 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       setSelectedCategory(null);
       setDateMs(Date.now());
       setTransactionType('EXPENSE');
+      setAccountId(null);
     }
-  }, [editId, loadTransaction, initialData, allCategories]);
+  }, [editId, duplicateFromId, loadTransaction, initialData, allCategories]);
 
   const openCategoryPicker = useCallback(async () => {
     setCatModalVisible(true);
@@ -202,7 +210,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       const parsed = parseFloat(String(amount).replace(/,/g, ''));
       if (Number.isNaN(parsed) || parsed <= 0) return false;
 
-      const finalAmount = transactionType === 'EXPENSE' ? -Math.abs(parsed) : Math.abs(parsed);
+      const finalAmount = Math.abs(parsed);
 
       let payeeId: string | null = null;
       if (merchant.trim()) {
@@ -218,6 +226,10 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
         createdAt: dateMs,
         transaction_type: transactionType,
       };
+
+      if (accountId) {
+        payload.accountId = accountId;
+      }
 
       if (editId) {
         if ((TransactionDAO as any).update) {
@@ -240,7 +252,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
     } finally {
       setLoading(false);
     }
-  }, [amount, notes, selectedCategory, dateMs, editId, merchant, transactionType, refreshData]);
+  }, [amount, notes, selectedCategory, dateMs, editId, merchant, transactionType, accountId, refreshData]);
 
   return {
     merchant,
@@ -277,6 +289,7 @@ export default function useAddExpense(editId?: string | undefined, initialData?:
       setSelectedCategory(null);
       setDateMs(Date.now());
       setTransactionType('EXPENSE');
+      setAccountId(null);
     }
   } as UseAddExpenseReturn & { payees: Payee[], onMerchantSelect: (p: Payee) => void, reset: () => void };
 }

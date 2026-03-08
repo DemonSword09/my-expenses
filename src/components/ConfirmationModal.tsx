@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useTheme from '../hooks/useTheme';
-import { SPACING, RADIUS } from '../styles/theme';
 
 interface Props {
     visible: boolean;
@@ -25,7 +24,7 @@ export default function ConfirmationModal({
     isDestructive = false,
     allowVoid = false,
 }: Props) {
-    const { globalStyle, schemeColors } = useTheme();
+    const { globalStyle, schemeColors, actionModalStyle } = useTheme();
     const [markVoid, setMarkVoid] = useState(false);
 
     useEffect(() => {
@@ -43,7 +42,7 @@ export default function ConfirmationModal({
 
     const toggleVoid = () => setMarkVoid((v) => !v);
 
-    const styles = getStyles(schemeColors);
+    const styles = actionModalStyle; // Used for content styles, globalStyle for overlay/sheet base
 
     // Determine confirm button color
     const confirmBtnColor = (isDestructive && !markVoid) ? schemeColors.danger : schemeColors.primary;
@@ -103,69 +102,3 @@ export default function ConfirmationModal({
         </Modal>
     );
 }
-
-const getStyles = (colors: any) => StyleSheet.create({
-    sheetContainer: {
-        paddingBottom: SPACING.xl,
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: SPACING.sm,
-        color: colors.textStrong,
-    },
-    message: {
-        fontSize: 16,
-        color: colors.textMuted,
-        marginBottom: SPACING.md,
-        lineHeight: 22,
-    },
-    checkboxRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: SPACING.sm,
-        marginBottom: SPACING.xs,
-    },
-    checkbox: {
-        width: 22,
-        height: 22,
-        borderRadius: RADIUS.sm,
-        borderWidth: 1,
-        borderColor: colors.muted,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'transparent',
-    },
-    checkboxLabel: {
-        marginLeft: SPACING.md,
-        fontSize: 15,
-        color: colors.text,
-    },
-    actionRow: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        marginTop: SPACING.lg,
-    },
-    cancelBtn: {
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
-        marginRight: SPACING.sm,
-        justifyContent: 'center',
-    },
-    cancelText: {
-        fontSize: 16,
-        color: colors.text,
-        fontWeight: '500',
-    },
-    confirmBtn: {
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.sm + 2,
-        borderRadius: RADIUS.md,
-        justifyContent: 'center',
-    },
-    confirmText: {
-        fontSize: 16,
-        color: '#FFFFFF', // Always white on primary/danger buttons
-        fontWeight: '700',
-    },
-});

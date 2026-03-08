@@ -1,15 +1,12 @@
 // src/components/CategoryPicker.tsx
 import React, { useState, useEffect } from 'react';
-import { Modal, TouchableOpacity, View, Text, FlatList, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { Modal, TouchableOpacity, View, Text, FlatList, StyleSheet, LayoutAnimation, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useTheme from '../../hooks/useTheme';
 import type { Category } from '../../db/models';
 import { formatColorValue } from '../../utils/colors';
-
-// Ensure LayoutAnimation works on Android
-// if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-//   UIManager.setLayoutAnimationEnabledExperimental(true);
-// }
+import { CategoryIcon } from './CategoryIcon';
 
 type CategoryNode = Category & { children: Category[] };
 
@@ -26,8 +23,29 @@ export default function CategoryPicker({
   categories,
   onCategoryPress,
 }: Props) {
-  const { schemeColors, globalStyle } = useTheme();
+  const { schemeColors, pickerModalStyle } = useTheme();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredCategories = React.useMemo(() => {
+    if (!searchQuery.trim()) return categories;
+    const lowerQuery = searchQuery.toLowerCase();
+    
+    return categories.map(parent => {
+      const parentMatch = parent.label.toLowerCase().includes(lowerQuery);
+      const filteredChildren = (parent.children || []).filter(child => 
+        child.label.toLowerCase().includes(lowerQuery)
+      );
+      
+      if (parentMatch || filteredChildren.length > 0) {
+        return {
+          ...parent,
+          children: parentMatch ? parent.children : filteredChildren
+        };
+      }
+      return null;
+    }).filter(Boolean) as CategoryNode[];
+  }, [categories, searchQuery]);
 
   const toggleExpand = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -39,11 +57,11 @@ export default function CategoryPicker({
     });
   };
 
-
+  const styles = pickerModalStyle; // Convenient alias
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onRequestClose}>
-      <View style={[styles.container, { backgroundColor: schemeColors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: schemeColors.background }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: schemeColors.border }]}>
           <TouchableOpacity onPress={onRequestClose} style={styles.headerButton}>
@@ -53,13 +71,32 @@ export default function CategoryPicker({
           <View style={styles.headerButton} />
         </View>
 
+        {/* Search */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8, paddingTop: 8 }}>
+          <TextInput
+            style={{
+              backgroundColor: schemeColors.bgMid,
+              color: schemeColors.text,
+              padding: 12,
+              borderRadius: 8,
+              fontSize: 16,
+            }}
+            placeholder="Search categories..."
+            placeholderTextColor={schemeColors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+          />
+        </View>
+
         {/* List */}
         <FlatList
-          data={categories}
+          data={filteredCategories}
           keyExtractor={(c) => c.id}
           contentContainerStyle={{ padding: 16 }}
           renderItem={({ item }) => {
-            const isExpanded = expandedIds.has(item.id);
+            const isSearching = !!searchQuery.trim();
+            const isExpanded = isSearching || expandedIds.has(item.id);
             const children = item.children || [];
             const hasChildren = children.length > 0;
 
@@ -76,10 +113,11 @@ export default function CategoryPicker({
                   activeOpacity={0.7}
                 >
                   <View style={[styles.iconBox, { backgroundColor: item.color ? item.color + '20' : schemeColors.bgMid }]}>
-                    <MaterialCommunityIcons
-                      name={(item.icon as any) || 'folder'}
+                    <CategoryIcon
+                      categoryLabel={item.label}
+                      categoryIcon={item.icon}
                       size={24}
-                      color={formatColorValue(item.color, schemeColors.primary)}
+                      color={schemeColors.primary}
                     />
                   </View>
                   <Text style={[styles.mainLabel, { color: schemeColors.text, flex: 1 }]}>{item.label}</Text>
@@ -96,7 +134,7 @@ export default function CategoryPicker({
                 {/* Children */}
                 {isExpanded && (
                   <View style={styles.childrenContainer}>
-                    {children.map(child => (
+                    {children.map((child: any) => (
                       <TouchableOpacity
                         key={child.id}
                         style={[styles.childRow, { borderTopColor: schemeColors.border }]}
@@ -104,10 +142,12 @@ export default function CategoryPicker({
                       >
                         <View style={[styles.childTreeLine, { backgroundColor: schemeColors.border }]} />
                         <View style={[styles.miniIcon, { backgroundColor: child.color ? formatColorValue(child.color, schemeColors.muted) + '20' : schemeColors.bgMid }]}>
-                          <MaterialCommunityIcons
-                            name={(child.icon as any) || 'circle-small'}
+                          <CategoryIcon
+                            categoryLabel={child.label}
+                            parentLabel={item.label}
+                            categoryIcon={child.icon}
                             size={14}
-                            color={child.color ? formatColorValue(child.color, schemeColors.primary) : schemeColors.textMuted}
+                            color={schemeColors.primary}
                           />
                         </View>
                         <Text style={[styles.childLabel, { color: schemeColors.text }]}>{child.label}</Text>
@@ -119,88 +159,7 @@ export default function CategoryPicker({
             );
           }}
         />
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 56,
-    borderBottomWidth: 0.5,
-  },
-  headerButton: {
-    minWidth: 60,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  // Card style from CategoryListScreen
-  // Card style from CategoryListScreen - Tinted
-  card: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    // Shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  mainSelectArea: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12, // Compact
-  },
-  iconBox: {
-    width: 36, // Compact
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  mainLabel: {
-    fontSize: 15, // Slightly smaller
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  childrenContainer: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
-    paddingBottom: 4,
-  },
-  childRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10, // Compact
-    paddingHorizontal: 12,
-    borderTopWidth: 1,
-  },
-  childTreeLine: {
-    width: 1,
-    height: '150%',
-    position: 'absolute',
-    left: 29, // Adjusted for new icon size/padding (12 pad + 36/2 center ~= 30)
-    top: -18,
-  },
-  miniIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 36, // Indent
-    marginRight: 10,
-  },
-  childLabel: {
-    fontSize: 14,
-  }
-});

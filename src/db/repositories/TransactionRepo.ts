@@ -386,16 +386,24 @@ export const TransactionRepo = {
 
   async findWithFilters(filters: {
     categoryId?: string;
+    categoryIds?: string[];
     accountId?: string;
     payeeId?: string;
     startDate?: number;
     endDate?: number;
     limit?: number;
+    orderBy?: 'date' | 'amount' | 'amount_asc';
   }): Promise<Transaction[]> {
+    // Restored SQL initialization
     let sql = `SELECT * FROM transactions WHERE deleted = 0 AND transaction_type = 'EXPENSE'`;
     const params: any[] = [];
 
-    if (filters.categoryId) {
+    // Category filter: prefer categoryIds (parent + children) over single categoryId
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND categoryId IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    } else if (filters.categoryId) {
       sql += ' AND categoryId = ?';
       params.push(filters.categoryId);
     }
@@ -416,7 +424,13 @@ export const TransactionRepo = {
       params.push(filters.endDate);
     }
 
-    sql += ' ORDER BY createdAt DESC';
+    if (filters.orderBy === 'amount') {
+      sql += ' ORDER BY amount DESC';
+    } else if (filters.orderBy === 'amount_asc') {
+      sql += ' ORDER BY amount ASC';
+    } else {
+      sql += ' ORDER BY createdAt DESC';
+    }
 
     if (filters.limit) {
       sql += ' LIMIT ?';
@@ -429,11 +443,47 @@ export const TransactionRepo = {
 
   async getSum(filters: {
     categoryId?: string;
+    categoryIds?: string[];
     accountId?: string;
     payeeId?: string;
     startDate?: number;
     endDate?: number;
   }): Promise<number> {
-    return await TransactionDAO.getSum(filters);
+    // TransactionDAO.getSum might strictly take specific fields? 
+    // Let's implement direct SQL here to support categoryIds, or update DAO.
+    // DAO is 'src/db/dao/TransactionDAO'. I should probably update that or inline SQL here.
+    // Inline is easier for this specific new requirement without changing DAO everywhere.
+
+    let sql = `SELECT SUM(amount) as total FROM transactions WHERE deleted = 0 AND transaction_type = 'EXPENSE'`;
+    const params: any[] = [];
+
+    // Category filter: prefer categoryIds (parent + children) over single categoryId
+    if (filters.categoryIds && filters.categoryIds.length > 0) {
+      const placeholders = filters.categoryIds.map(() => '?').join(',');
+      sql += ` AND categoryId IN (${placeholders})`;
+      params.push(...filters.categoryIds);
+    } else if (filters.categoryId) {
+      sql += ' AND categoryId = ?';
+      params.push(filters.categoryId);
+    }
+    if (filters.accountId) {
+      sql += ' AND accountId = ?';
+      params.push(filters.accountId);
+    }
+    if (filters.payeeId) {
+      sql += ' AND payeeId = ?';
+      params.push(filters.payeeId);
+    }
+    if (filters.startDate) {
+      sql += ' AND createdAt >= ?';
+      params.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      sql += ' AND createdAt <= ?';
+      params.push(filters.endDate);
+    }
+
+    const res = await first<{ total: number }>(sql, params);
+    return res?.total ?? 0;
   }
 };

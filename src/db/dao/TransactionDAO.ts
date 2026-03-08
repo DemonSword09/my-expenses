@@ -86,27 +86,15 @@ export const TransactionDAO = {
         return await first<TransactionRow>('SELECT * FROM transactions WHERE id = ? LIMIT 1', [id]);
     },
 
-    async update(id: string, t: Transaction): Promise<void> {
-        await run(
-            `UPDATE transactions SET 
-                amount = ?, comment = ?, accountId = ?, payeeId = ?, categoryId = ?, 
-                status = ?, cr_amount = ?, transaction_type = ?, createdAt = ?, updatedAt = ?, deleted = ? 
-            WHERE id = ?`,
-            [
-                t.amount,
-                t.comment,
-                t.accountId,
-                t.payeeId,
-                t.categoryId,
-                t.status,
-                t.cr_amount,
-                t.transaction_type,
-                t.createdAt,
-                t.updatedAt,
-                t.deleted,
-                id
-            ]
-        );
+    async update(id: string, t: Partial<Transaction>): Promise<void> {
+        const keys = Object.keys(t).filter(k => k !== 'id');
+        if (keys.length === 0) return;
+
+        const setClause = keys.map(k => `${k} = ?`).join(', ');
+        const values = keys.map(k => (t as any)[k]);
+        values.push(id);
+
+        await run(`UPDATE transactions SET ${setClause} WHERE id = ?`, values);
     },
 
     async delete(id: string): Promise<void> {

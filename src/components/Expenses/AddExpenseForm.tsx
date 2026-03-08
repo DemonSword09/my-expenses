@@ -12,7 +12,13 @@ const AddExpenseForm = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const params: any = (route as any).params ?? {};
-  const editId: string | undefined = params.id;
+  // Support both 'id' and 'expenseId' for backwards compatibility
+  const expenseId: string | undefined = params.id || params.expenseId;
+  const mode = params.mode;
+
+  const isDuplicate = mode === 'duplicate';
+  const realEditId = isDuplicate ? undefined : expenseId;
+  const duplicateId = isDuplicate ? expenseId : undefined;
 
   const { schemeColors, globalStyle, addExpenseStyle } = useTheme();
 
@@ -39,7 +45,7 @@ const AddExpenseForm = () => {
     onMerchantSelect,
     transactionType,
     setTransactionType,
-  } = useAddExpense(editId);
+  } = useAddExpense(realEditId, duplicateId);
 
   const [formErrors, setFormErrors] = React.useState<{ amount?: string }>({});
 
@@ -52,39 +58,6 @@ const AddExpenseForm = () => {
       return () => clearTimeout(timer);
     }
   }, [formErrors]);
-
-  const styles = React.useMemo(() => StyleSheet.create({
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      height: 64,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: schemeColors.border,
-    },
-    headerButton: {
-      padding: 4,
-    },
-    headerButtonText: {
-      color: schemeColors.primary,
-      fontSize: 17,
-    },
-    headerTitle: {
-      fontSize: 17,
-      fontWeight: '600',
-      color: schemeColors.text,
-    },
-    saveButtonText: {
-      color: schemeColors.primary,
-      fontSize: 17,
-      fontWeight: '600',
-    },
-    bottomSaveButton: {
-      marginTop: 24,
-    }
-  }), [schemeColors]);
 
   const onSave = async () => {
     // Validate locally
@@ -114,18 +87,18 @@ const AddExpenseForm = () => {
   return (
     <View style={globalStyle.container}>
       {/* Custom Header matching TemplateEditor */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-          <Text style={styles.headerButtonText}>Cancel</Text>
+      <View style={addExpenseStyle.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={addExpenseStyle.headerButton}>
+          <Text style={addExpenseStyle.headerButtonText}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {editId ? 'Edit Transaction' : 'New Transaction'}
+        <Text style={addExpenseStyle.headerTitle}>
+          {realEditId ? 'Edit Transaction' : 'New Transaction'}
         </Text>
-        <TouchableOpacity onPress={onSave} disabled={loading} style={styles.headerButton}>
+        <TouchableOpacity onPress={onSave} disabled={loading} style={addExpenseStyle.headerButton}>
           {loading ? (
             <ActivityIndicator size="small" color={schemeColors.primary} />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={addExpenseStyle.saveButtonText}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -156,7 +129,7 @@ const AddExpenseForm = () => {
           <TouchableOpacity
             onPress={onSave}
             disabled={loading}
-            style={[globalStyle.glassBase, addExpenseStyle.glassSaveButton, styles.bottomSaveButton, { opacity: loading ? 0.7 : 1 }]}
+            style={[globalStyle.glassBase, addExpenseStyle.glassSaveButton, addExpenseStyle.bottomSaveButton, { opacity: loading ? 0.7 : 1 }]}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />

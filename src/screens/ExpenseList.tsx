@@ -1,8 +1,9 @@
 // src/screens/ExpenseList.tsx
 import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Modal, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useMLStore } from '../store/useMLStore';
 
 import ExpenseListItem from '../components/Expenses/ExpenseListItem';
 import ActionSheet from '@src/components/ActionSheet';
@@ -78,6 +79,8 @@ export default function ExpenseListScreen() {
     anchor: { x: number; y: number; width: number; height: number } | null;
     item: TransactionDetail | null;
   }>({ visible: false, anchor: null, item: null });
+
+  const isMLReady = useMLStore(state => state.isReady);
 
   // --- Lifecycle ---
   useFocusEffect(
@@ -238,10 +241,15 @@ export default function ExpenseListScreen() {
       {!selectionMode && (
         <>
           <TouchableOpacity
-            style={[globalStyle.fab, { left: 20, right: undefined, backgroundColor: schemeColors.primary }]}
+            style={[globalStyle.fab, { left: 20, right: undefined, backgroundColor: isMLReady ? schemeColors.primary : schemeColors.textMuted }]}
             onPress={() => (navigation as any).navigate('ChatAgent')}
+            disabled={!isMLReady}
           >
-            <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            {isMLReady ? (
+              <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
+            ) : (
+              <ActivityIndicator size="small" color="#fff" />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

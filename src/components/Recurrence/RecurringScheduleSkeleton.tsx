@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, Easing } from 'react-native';
+import { View, Animated, Easing } from 'react-native';
+import useTheme from '../../hooks/useTheme';
 
 const SkeletonItem = ({ schemeColors }: { schemeColors: any }) => {
+    const { recurrenceStyle } = useTheme();
     const animatedValue = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -31,45 +33,20 @@ const SkeletonItem = ({ schemeColors }: { schemeColors: any }) => {
     const baseColor = schemeColors.border; // Use border color as base for skeleton
 
     return (
-        <View style={[styles.itemRow, { borderBottomColor: schemeColors.border }]}>
-            <View style={styles.dateCol}>
-                <Animated.View style={[styles.skeletonBox, { width: 40, height: 14, backgroundColor: baseColor, opacity, marginBottom: 4 }]} />
-                <Animated.View style={[styles.skeletonBox, { width: 30, height: 12, backgroundColor: baseColor, opacity }]} />
+        <View style={[recurrenceStyle.itemRow, { borderBottomColor: schemeColors.border }]}>
+            <View style={recurrenceStyle.dateCol}>
+                <Animated.View style={[recurrenceStyle.skeletonBox, { width: 40, height: 14, backgroundColor: baseColor, opacity, marginBottom: 4 }]} />
+                <Animated.View style={[recurrenceStyle.skeletonBox, { width: 30, height: 12, backgroundColor: baseColor, opacity }]} />
             </View>
-            <View style={styles.detailsCol}>
-                <Animated.View style={[styles.skeletonBox, { width: '70%', height: 16, backgroundColor: baseColor, opacity, marginBottom: 6 }]} />
-                <Animated.View style={[styles.skeletonBox, { width: '40%', height: 14, backgroundColor: baseColor, opacity }]} />
+            <View style={recurrenceStyle.detailsCol}>
+                <Animated.View style={[recurrenceStyle.skeletonBox, { width: '70%', height: 16, backgroundColor: baseColor, opacity, marginBottom: 6 }]} />
+                <Animated.View style={[recurrenceStyle.skeletonBox, { width: '40%', height: 14, backgroundColor: baseColor, opacity }]} />
             </View>
-            <View style={styles.statusCol}>
-                <Animated.View style={[styles.skeletonBox, { width: 20, height: 20, borderRadius: 10, backgroundColor: baseColor, opacity }]} />
+            <View style={recurrenceStyle.statusCol}>
+                <Animated.View style={[recurrenceStyle.skeletonBox, { width: 20, height: 20, borderRadius: 10, backgroundColor: baseColor, opacity }]} />
             </View>
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    itemRow: {
-        flexDirection: 'row',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        alignItems: 'center',
-    },
-    dateCol: {
-        width: 60,
-        alignItems: 'center',
-    },
-    detailsCol: {
-        flex: 1,
-        paddingHorizontal: 12,
-    },
-    statusCol: {
-        width: 40,
-        alignItems: 'center',
-    },
-    skeletonBox: {
-        borderRadius: 4,
-    },
-});
 
 export default SkeletonItem;
