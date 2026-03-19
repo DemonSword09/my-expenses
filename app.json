@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Expenses",
-    "slug": "my-expenses-beta",
+    "slug": "my-expenses",
     "version": "0.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,12 +16,8 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.harsh.myexpenses",
+      "package": "com.harsh.expenses",
       "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -32,6 +28,20 @@
       "eas": {
         "projectId": "c8b141c8-019b-47d5-bd8f-23556a8699f0"
       }
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-sqlite",
+      [
+        "expo-asset",
+        {
+          "assets": [
+            "./assets/expense_tracker.quant.onnx",
+            "./assets/vocab.txt"
+          ]
+        }
+      ],
+      "./plugins/withOnnxruntime"
+    ]
   }
 }
